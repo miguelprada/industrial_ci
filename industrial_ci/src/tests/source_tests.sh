@@ -39,9 +39,6 @@ else
 fi
 
 ici_time_start init_ici_environment
-# Define more env vars
-BUILDER=catkin
-ROSWS=wstool
 
 ici_time_end  # init_ici_environment
 
@@ -93,14 +90,14 @@ ici_retry 2 rosdep update "${update_opts[@]}"
 
 ici_time_end  # setup_rosdep
 
-ici_time_start setup_rosws
+ici_time_start setup_wstool
 
 ## BEGIN: travis' install: # Use this to install any prerequisites or dependencies necessary to run your build ##
 # Create workspace
 export CATKIN_WORKSPACE=~/catkin_ws
 mkdir -p $CATKIN_WORKSPACE/src
 if [ ! -f $CATKIN_WORKSPACE/src/.rosinstall ]; then
-  $ROSWS init $CATKIN_WORKSPACE/src
+  wstool init $CATKIN_WORKSPACE/src
 fi
 case "$UPSTREAM_WORKSPACE" in
 debian)
@@ -110,25 +107,25 @@ file) # When UPSTREAM_WORKSPACE is file, the dependended packages that need to b
     # Prioritize $ROSINSTALL_FILENAME.$ROS_DISTRO if it exists over $ROSINSTALL_FILENAME.
     if [ -e $TARGET_REPO_PATH/$ROSINSTALL_FILENAME.$ROS_DISTRO ]; then
         # install (maybe unreleased version) dependencies from source for specific ros version
-        $ROSWS merge -t $CATKIN_WORKSPACE/src file://$TARGET_REPO_PATH/$ROSINSTALL_FILENAME.$ROS_DISTRO
+        wstool merge -t $CATKIN_WORKSPACE/src file://$TARGET_REPO_PATH/$ROSINSTALL_FILENAME.$ROS_DISTRO
     elif [ -e $TARGET_REPO_PATH/$ROSINSTALL_FILENAME ]; then
         # install (maybe unreleased version) dependencies from source
-        $ROSWS merge -t $CATKIN_WORKSPACE/src file://$TARGET_REPO_PATH/$ROSINSTALL_FILENAME
+        wstool merge -t $CATKIN_WORKSPACE/src file://$TARGET_REPO_PATH/$ROSINSTALL_FILENAME
     else
         error "UPSTREAM_WORKSPACE file '$TARGET_REPO_PATH/$ROSINSTALL_FILENAME[.$ROS_DISTRO]' does not exist"
     fi
     ;;
 http://* | https://*) # When UPSTREAM_WORKSPACE is an http url, use it directly
-    $ROSWS merge -t $CATKIN_WORKSPACE/src $UPSTREAM_WORKSPACE
+    wstool merge -t $CATKIN_WORKSPACE/src $UPSTREAM_WORKSPACE
     ;;
 esac
 
 # download upstream packages into workspace
 if [ -e $CATKIN_WORKSPACE/src/.rosinstall ]; then
     # ensure that the target is not in .rosinstall
-    (cd $CATKIN_WORKSPACE/src; $ROSWS rm $TARGET_REPO_NAME 2> /dev/null \
-     && echo "$ROSWS ignored $TARGET_REPO_NAME found in $CATKIN_WORKSPACE/src/.rosinstall file. Its source fetched from your repository is used instead." || true) # TODO: add warn function
-    $ROSWS update -t $CATKIN_WORKSPACE/src
+    (cd $CATKIN_WORKSPACE/src; wstool rm $TARGET_REPO_NAME 2> /dev/null \
+     && echo "wstool ignored $TARGET_REPO_NAME found in $CATKIN_WORKSPACE/src/.rosinstall file. Its source fetched from your repository is used instead." || true) # TODO: add warn function
+    wstool update -t $CATKIN_WORKSPACE/src
 fi
 # TARGET_REPO_PATH is the path of the downstream repository that we are testing. Link it to the catkin workspace
 ln -sf $TARGET_REPO_PATH $CATKIN_WORKSPACE/src
@@ -143,7 +140,7 @@ fi
 catkin config --install
 if [ -n "$CATKIN_CONFIG" ]; then eval catkin config $CATKIN_CONFIG; fi
 
-ici_time_end  # setup_rosws
+ici_time_end  # setup_wstool
 
 
 # execute BEFORE_SCRIPT in repository, exit on errors
@@ -184,27 +181,21 @@ if [ "${TARGET_PKGS// }" == "" ]; then export TARGET_PKGS=`catkin_topological_or
 # fall-back to all workspace packages if target repo does not contain any packages (#232)
 if [ "${TARGET_PKGS// }" == "" ]; then export TARGET_PKGS=`catkin_topological_order $CATKIN_WORKSPACE/src --only-names`; fi
 if [ "${PKGS_DOWNSTREAM// }" == "" ]; then export PKGS_DOWNSTREAM=$( [ "${BUILD_PKGS_WHITELIST// }" == "" ] && echo "$TARGET_PKGS" || echo "$BUILD_PKGS_WHITELIST"); fi
-if [ "$BUILDER" == catkin ]; then catkin build $OPT_VI --summarize  --no-status $BUILD_PKGS_WHITELIST $CATKIN_PARALLEL_JOBS --make-args $ROS_PARALLEL_JOBS            ; fi
+catkin build $OPT_VI --summarize  --no-status $BUILD_PKGS_WHITELIST $CATKIN_PARALLEL_JOBS --make-args $ROS_PARALLEL_JOBS
 
 ici_time_end  # catkin_build
 
 if [ "$NOT_TEST_BUILD" != "true" ]; then
     ici_time_start catkin_build_downstream_pkgs
-    if [ "$BUILDER" == catkin ]; then
-        catkin build $OPT_VI --summarize  --no-status $PKGS_DOWNSTREAM $CATKIN_PARALLEL_JOBS --make-args $ROS_PARALLEL_JOBS
-    fi
+    catkin build $OPT_VI --summarize  --no-status $PKGS_DOWNSTREAM $CATKIN_PARALLEL_JOBS --make-args $ROS_PARALLEL_JOBS
     ici_time_end  # catkin_build_downstream_pkgs
 
     ici_time_start catkin_build_tests
-    if [ "$BUILDER" == catkin ]; then
-        catkin build --no-deps --catkin-make-args tests -- $OPT_VI --summarize  --no-status $PKGS_DOWNSTREAM $CATKIN_PARALLEL_JOBS --make-args $ROS_PARALLEL_JOBS --
-    fi
-    ici_time_end  # catkin_build_tests
+    catkin build --no-deps --catkin-make-args tests -- $OPT_VI --summarize  --no-status $PKGS_DOWNSTREAM $CATKIN_PARALLEL_JOBS --make-args $ROS_PARALLEL_JOBS --
 
+    ici_time_end  # catkin_build_tests
     ici_time_start catkin_run_tests
-    if [ "$BUILDER" == catkin ]; then
-        catkin build --no-deps --catkin-make-args run_tests -- $OPT_RUN_V --no-status $PKGS_DOWNSTREAM $CATKIN_PARALLEL_TEST_JOBS --make-args $ROS_PARALLEL_TEST_JOBS --
-        catkin_test_results --verbose $CATKIN_WORKSPACE || error
-    fi
+    catkin build --no-deps --catkin-make-args run_tests -- $OPT_RUN_V --no-status $PKGS_DOWNSTREAM $CATKIN_PARALLEL_TEST_JOBS --make-args $ROS_PARALLEL_TEST_JOBS --
+    catkin_test_results --verbose $CATKIN_WORKSPACE || error
     ici_time_end  # catkin_run_tests
 fi
