@@ -239,10 +239,11 @@ RUN sed -i "/^# deb.*multiverse/ s/^# //" /etc/apt/sources.list \
     && apt-get update -qq \
     && apt-get -qq install --no-install-recommends -y \
         build-essential \
+        git-core \
         python-catkin-tools \
         python-pip \
         python-rosdep \
-        python-wstool \
+        python-vcstool \
         ros-$ROS_DISTRO-catkin \
         ssh-client \
     && apt-get clean \

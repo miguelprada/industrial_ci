@@ -70,53 +70,45 @@ function prepare_source_tests {
     ici_time_end  # setup_rosdep
 }
 
-function prepare_sourcespace {
+function vcs_import_file {
+    local ws=$1; shift
+    local file=$1; shift
+
+    if [ -e "$TARGET_REPO_PATH/$file.$ROS_DISTRO" ]; then
+        # install (maybe unreleased version) dependencies from source for specific ros version
+        vcs import "$ws" < "$TARGET_REPO_PATH/$file.$ROS_DISTRO"
+    elif [ -e "$TARGET_REPO_PATH/$file" ]; then
+        # install (maybe unreleased version) dependencies from source
+        vcs import "$ws" < "$TARGET_REPO_PATH/$file"
+    else
+        error "UPSTREAM_WORKSPACE file '$file[.$ROS_DISTRO]' does not exist"
+    fi
+
+}
+
+function prepare_upstream {
     local sourcespace="$1"; shift
 
     mkdir -p "$sourcespace"
-    if [ ! -f "$sourcespace/.rosinstall" ]; then
-      wstool init "$sourcespace"
-    fi
+
     for upstream in "$@"; do
         case "$upstream" in
         debian)
             echo "Obtain deb binary for upstream packages."
             ;;
         file) # When UPSTREAM_WORKSPACE is file, the dependended packages that need to be built from source are downloaded based on $ROSINSTALL_FILENAME file.
-            # Prioritize $ROSINSTALL_FILENAME.$ROS_DISTRO if it exists over $ROSINSTALL_FILENAME.
-            if [ -e $TARGET_REPO_PATH/$ROSINSTALL_FILENAME.$ROS_DISTRO ]; then
-                # install (maybe unreleased version) dependencies from source for specific ros version
-                wstool merge -t "$sourcespace" file://$TARGET_REPO_PATH/$ROSINSTALL_FILENAME.$ROS_DISTRO
-            elif [ -e $TARGET_REPO_PATH/$ROSINSTALL_FILENAME ]; then
-                # install (maybe unreleased version) dependencies from source
-                wstool merge -t "$sourcespace" file://$TARGET_REPO_PATH/$ROSINSTALL_FILENAME
-            else
-                error "UPSTREAM_WORKSPACE file '$TARGET_REPO_PATH/$ROSINSTALL_FILENAME[.$ROS_DISTRO]' does not exist"
-            fi
+            vcs_import_file "$sourcespace" "$ROSINSTALL_FILENAME"
             ;;
         http://* | https://*) # When UPSTREAM_WORKSPACE is an http url, use it directly
-            wstool merge -t "$sourcespace" "upstream"
+            set -o pipefail
+            wget -O- -q "$upstream" | vcs import "$sourcespace"
+            set +o pipefail
+            ;;
+        *)
+            vcs_import_file "$sourcespace" "$upstream"
             ;;
         esac
     done
-
-    # download upstream packages into workspace
-    if [ -e "$sourcespace/.rosinstall" ]; then
-        # ensure that the target is not in .rosinstall
-        (cd "$sourcespace"; wstool rm $TARGET_REPO_NAME 2> /dev/null \
-         && echo "wstool ignored $TARGET_REPO_NAME found in $sourcespace/.rosinstall file. Its source fetched from your repository is used instead." || true) # TODO: add warn function
-        wstool update -t "$sourcespace"
-    fi
-
-    # TARGET_REPO_PATH is the path of the downstream repository that we are testing. Link it to the catkin workspace
-    ln -sf $TARGET_REPO_PATH "$sourcespace"
-
-    if [ "${USE_MOCKUP// }" != "" ]; then
-        if [ ! -d "$TARGET_REPO_PATH/$USE_MOCKUP" ]; then
-            error "mockup directory '$USE_MOCKUP' does not exist"
-        fi
-        ln -sf "$TARGET_REPO_PATH/$USE_MOCKUP" "$sourcespace"
-    fi
 }
 
 function run_source_tests {
@@ -135,9 +127,27 @@ function run_source_tests {
 
     ici_time_start setup_workspace
     export CATKIN_WORKSPACE=~/catkin_ws
-    prepare_sourcespace "$CATKIN_WORKSPACE/src" $UPSTREAM_WORKSPACE
+    prepare_upstream "$CATKIN_WORKSPACE/src/_upstream" $UPSTREAM_WORKSPACE
 
-    catkin config -w "$CATKIN_WORKSPACE"  -install
+    for p in $(catkin_topological_order "${TARGET_REPO_PATH}" --only-names); do
+        local dup=$(catkin_find_pkg "$p" "$CATKIN_WORKSPACE/src" 2> /dev/null)
+        if [ -n "$dup" ]; then
+            ici_warn "removing duplicated package '$p' ($dup)"
+            rm -rf "$dup"
+        fi
+    done
+
+    # TARGET_REPO_PATH is the path of the downstream repository that we are testing. copy it to the catkin workspace
+    cp -a $TARGET_REPO_PATH "$CATKIN_WORKSPACE/src"
+
+    if [ "${USE_MOCKUP// }" != "" ]; then
+        if [ ! -d "$TARGET_REPO_PATH/$USE_MOCKUP" ]; then
+            error "mockup directory '$USE_MOCKUP' does not exist"
+        fi
+        ln -sf "$TARGET_REPO_PATH/$USE_MOCKUP" "$CATKIN_WORKSPACE/src"
+    fi
+
+    catkin config -w "$CATKIN_WORKSPACE"  --install
     if [ -n "$CATKIN_CONFIG" ]; then eval catkin config -w "$CATKIN_WORKSPACE" $CATKIN_CONFIG; fi
     ici_time_end  # setup_workspace
 
