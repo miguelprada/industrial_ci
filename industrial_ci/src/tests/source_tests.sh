@@ -22,180 +22,177 @@
 # It is dependent on environment variables that need to be exported in advance
 # (As of version 0.4.4 most of them are defined in env.sh).
 
-ici_require_run_in_docker # this script must be run in docker
+# execute BEFORE_SCRIPT in repository, exit on errors
 
-#Define some verbose env vars
-#verbose build
-if [ "$VERBOSE_OUTPUT" ] && [ "$VERBOSE_OUTPUT" == true ]; then
-    OPT_VI="-vi"
-else
-    OPT_VI=""
-fi
-#verbose run tests
-if [ "$VERBOSE_TESTS" == false ]; then
-    OPT_RUN_V=""
-else
-    OPT_RUN_V="-v"
-fi
-
-ici_time_start init_ici_environment
-
-ici_time_end  # init_ici_environment
-
-function catkin {
-  local path
-  path=$(which catkin) || error "catkin not available. Make sure python-catkin-tools is installed. See also https://github.com/ros-industrial/industrial_ci/issues/216"
-  local cmd=$1
-  shift
-  "$path" "$cmd" -w "$CATKIN_WORKSPACE" "$@"
+function run_catkin_lint {
+    local path=$1; shift
+    sudo pip install catkin-lint
+    catkin_lint --explain "$@" "$path" && echo "catkin_lint passed." || error "catkin_lint failed by either/both errors and/or warnings"
 }
 
-ici_time_start setup_apt
+function prepare_source_tests {
+    ici_time_start setup_apt
+    sudo apt-get update -qq
 
-sudo apt-get update -qq
-
-# If more DEBs needed during preparation, define ADDITIONAL_DEBS variable where you list the name of DEB(S, delimitted by whitespace)
-if [ "$ADDITIONAL_DEBS" ]; then
-    sudo apt-get install -qq -y $ADDITIONAL_DEBS || error "One or more additional deb installation is failed. Exiting."
-fi
-source /opt/ros/$ROS_DISTRO/setup.bash
-
-ici_time_end  # setup_apt
-
-if [ "$CCACHE_DIR" ]; then
-    ici_time_start setup_ccache
-    sudo apt-get install -qq -y ccache || error "Could not install ccache. Exiting."
-    export PATH="/usr/lib/ccache:$PATH"
-    ici_time_end  # setup_ccache
-fi
-
-ici_time_start setup_rosdep
-
-# Setup rosdep
-rosdep --version
-if ! [ -d /etc/ros/rosdep/sources.list.d ]; then
-    sudo rosdep init
-fi
-
-update_opts=()
-case "$ROS_DISTRO" in
-"jade")
-    if rosdep update --help | grep -q -- --include-eol-distros; then
-      update_opts+=(--include-eol-distros)
+    # If more DEBs needed during preparation, define ADDITIONAL_DEBS variable where you list the name of DEB(S, delimitted by whitespace)
+    if [ "$ADDITIONAL_DEBS" ]; then
+        sudo apt-get install -qq -y $ADDITIONAL_DEBS || error "One or more additional deb installation is failed. Exiting."
     fi
-    ;;
-esac
+    source /opt/ros/$ROS_DISTRO/setup.bash
+    ici_time_end  # setup_apt
 
-ici_retry 2 rosdep update "${update_opts[@]}"
-
-ici_time_end  # setup_rosdep
-
-ici_time_start setup_wstool
-
-## BEGIN: travis' install: # Use this to install any prerequisites or dependencies necessary to run your build ##
-# Create workspace
-export CATKIN_WORKSPACE=~/catkin_ws
-mkdir -p $CATKIN_WORKSPACE/src
-if [ ! -f $CATKIN_WORKSPACE/src/.rosinstall ]; then
-  wstool init $CATKIN_WORKSPACE/src
-fi
-case "$UPSTREAM_WORKSPACE" in
-debian)
-    echo "Obtain deb binary for upstream packages."
-    ;;
-file) # When UPSTREAM_WORKSPACE is file, the dependended packages that need to be built from source are downloaded based on $ROSINSTALL_FILENAME file.
-    # Prioritize $ROSINSTALL_FILENAME.$ROS_DISTRO if it exists over $ROSINSTALL_FILENAME.
-    if [ -e $TARGET_REPO_PATH/$ROSINSTALL_FILENAME.$ROS_DISTRO ]; then
-        # install (maybe unreleased version) dependencies from source for specific ros version
-        wstool merge -t $CATKIN_WORKSPACE/src file://$TARGET_REPO_PATH/$ROSINSTALL_FILENAME.$ROS_DISTRO
-    elif [ -e $TARGET_REPO_PATH/$ROSINSTALL_FILENAME ]; then
-        # install (maybe unreleased version) dependencies from source
-        wstool merge -t $CATKIN_WORKSPACE/src file://$TARGET_REPO_PATH/$ROSINSTALL_FILENAME
-    else
-        error "UPSTREAM_WORKSPACE file '$TARGET_REPO_PATH/$ROSINSTALL_FILENAME[.$ROS_DISTRO]' does not exist"
+    if [ "$CCACHE_DIR" ]; then
+        ici_time_start setup_ccache
+        sudo apt-get install -qq -y ccache || error "Could not install ccache. Exiting."
+        export PATH="/usr/lib/ccache:$PATH"
+        ici_time_end  # setup_ccache
     fi
-    ;;
-http://* | https://*) # When UPSTREAM_WORKSPACE is an http url, use it directly
-    wstool merge -t $CATKIN_WORKSPACE/src $UPSTREAM_WORKSPACE
-    ;;
-esac
 
-# download upstream packages into workspace
-if [ -e $CATKIN_WORKSPACE/src/.rosinstall ]; then
-    # ensure that the target is not in .rosinstall
-    (cd $CATKIN_WORKSPACE/src; wstool rm $TARGET_REPO_NAME 2> /dev/null \
-     && echo "wstool ignored $TARGET_REPO_NAME found in $CATKIN_WORKSPACE/src/.rosinstall file. Its source fetched from your repository is used instead." || true) # TODO: add warn function
-    wstool update -t $CATKIN_WORKSPACE/src
-fi
-# TARGET_REPO_PATH is the path of the downstream repository that we are testing. Link it to the catkin workspace
-ln -sf $TARGET_REPO_PATH $CATKIN_WORKSPACE/src
+    ici_time_start setup_rosdep
 
-if [ "${USE_MOCKUP// }" != "" ]; then
-    if [ ! -d "$TARGET_REPO_PATH/$USE_MOCKUP" ]; then
-        error "mockup directory '$USE_MOCKUP' does not exist"
+    # Setup rosdep
+    rosdep --version
+    if ! [ -d /etc/ros/rosdep/sources.list.d ]; then
+        sudo rosdep init
     fi
-    ln -sf "$TARGET_REPO_PATH/$USE_MOCKUP" $CATKIN_WORKSPACE/src
-fi
 
-catkin config --install
-if [ -n "$CATKIN_CONFIG" ]; then eval catkin config $CATKIN_CONFIG; fi
+    update_opts=()
+    case "$ROS_DISTRO" in
+    "jade")
+        if rosdep update --help | grep -q -- --include-eol-distros; then
+          update_opts+=(--include-eol-distros)
+        fi
+        ;;
+    esac
 
-ici_time_end  # setup_wstool
+    ici_retry 2 rosdep update "${update_opts[@]}"
 
+    ici_time_end  # setup_rosdep
+}
 
-# execute BEFORE_SCRIPT in repository, exit on errors
-if [ "${BEFORE_SCRIPT// }" != "" ]; then
-  ici_time_start before_script
+function prepare_sourcespace {
+    local sourcespace="$1"; shift
 
-  bash -e -c "cd $TARGET_REPO_PATH; ${BEFORE_SCRIPT}"
-
-  ici_time_end  # before_script
-fi
-
-ici_time_start rosdep_install
-
-rosdep_opts=(-q --from-paths $CATKIN_WORKSPACE/src --ignore-src --rosdistro $ROS_DISTRO -y)
-if [ -n "$ROSDEP_SKIP_KEYS" ]; then
-  rosdep_opts+=(--skip-keys "$ROSDEP_SKIP_KEYS")
-fi
-set -o pipefail # fail if rosdep install fails
-rosdep install "${rosdep_opts[@]}" | { grep "executing command" || true; }
-set +o pipefail
-
-ici_time_end  # rosdep_install
-
-if [ "$CATKIN_LINT" == "true" ] || [ "$CATKIN_LINT" == "pedantic" ]; then
-    ici_time_start catkin_lint
-    sudo pip install catkin-lint
-    if [ "$CATKIN_LINT" == "pedantic" ]; then
-    	CATKIN_LINT_ARGS="$CATKIN_LINT_ARGS --strict -W2"
+    mkdir -p "$sourcespace"
+    if [ ! -f "$sourcespace/.rosinstall" ]; then
+      wstool init "$sourcespace"
     fi
-    catkin_lint --explain $CATKIN_LINT_ARGS $TARGET_REPO_PATH && echo "catkin_lint passed." || error "catkin_lint failed by either/both errors and/or warnings"
-    ici_time_end  # catkin_lint
-fi
+    for upstream in "$@"; do
+        case "$upstream" in
+        debian)
+            echo "Obtain deb binary for upstream packages."
+            ;;
+        file) # When UPSTREAM_WORKSPACE is file, the dependended packages that need to be built from source are downloaded based on $ROSINSTALL_FILENAME file.
+            # Prioritize $ROSINSTALL_FILENAME.$ROS_DISTRO if it exists over $ROSINSTALL_FILENAME.
+            if [ -e $TARGET_REPO_PATH/$ROSINSTALL_FILENAME.$ROS_DISTRO ]; then
+                # install (maybe unreleased version) dependencies from source for specific ros version
+                wstool merge -t "$sourcespace" file://$TARGET_REPO_PATH/$ROSINSTALL_FILENAME.$ROS_DISTRO
+            elif [ -e $TARGET_REPO_PATH/$ROSINSTALL_FILENAME ]; then
+                # install (maybe unreleased version) dependencies from source
+                wstool merge -t "$sourcespace" file://$TARGET_REPO_PATH/$ROSINSTALL_FILENAME
+            else
+                error "UPSTREAM_WORKSPACE file '$TARGET_REPO_PATH/$ROSINSTALL_FILENAME[.$ROS_DISTRO]' does not exist"
+            fi
+            ;;
+        http://* | https://*) # When UPSTREAM_WORKSPACE is an http url, use it directly
+            wstool merge -t "$sourcespace" "upstream"
+            ;;
+        esac
+    done
 
-ici_time_start catkin_build
+    # download upstream packages into workspace
+    if [ -e "$sourcespace/.rosinstall" ]; then
+        # ensure that the target is not in .rosinstall
+        (cd "$sourcespace"; wstool rm $TARGET_REPO_NAME 2> /dev/null \
+         && echo "wstool ignored $TARGET_REPO_NAME found in $sourcespace/.rosinstall file. Its source fetched from your repository is used instead." || true) # TODO: add warn function
+        wstool update -t "$sourcespace"
+    fi
 
-# for catkin
-if [ "${TARGET_PKGS// }" == "" ]; then export TARGET_PKGS=`catkin_topological_order ${TARGET_REPO_PATH} --only-names`; fi
-# fall-back to all workspace packages if target repo does not contain any packages (#232)
-if [ "${TARGET_PKGS// }" == "" ]; then export TARGET_PKGS=`catkin_topological_order $CATKIN_WORKSPACE/src --only-names`; fi
-if [ "${PKGS_DOWNSTREAM// }" == "" ]; then export PKGS_DOWNSTREAM=$( [ "${BUILD_PKGS_WHITELIST// }" == "" ] && echo "$TARGET_PKGS" || echo "$BUILD_PKGS_WHITELIST"); fi
-catkin build $OPT_VI --summarize  --no-status $BUILD_PKGS_WHITELIST $CATKIN_PARALLEL_JOBS --make-args $ROS_PARALLEL_JOBS
+    # TARGET_REPO_PATH is the path of the downstream repository that we are testing. Link it to the catkin workspace
+    ln -sf $TARGET_REPO_PATH "$sourcespace"
 
-ici_time_end  # catkin_build
+    if [ "${USE_MOCKUP// }" != "" ]; then
+        if [ ! -d "$TARGET_REPO_PATH/$USE_MOCKUP" ]; then
+            error "mockup directory '$USE_MOCKUP' does not exist"
+        fi
+        ln -sf "$TARGET_REPO_PATH/$USE_MOCKUP" "$sourcespace"
+    fi
+}
 
-if [ "$NOT_TEST_BUILD" != "true" ]; then
-    ici_time_start catkin_build_downstream_pkgs
-    catkin build $OPT_VI --summarize  --no-status $PKGS_DOWNSTREAM $CATKIN_PARALLEL_JOBS --make-args $ROS_PARALLEL_JOBS
-    ici_time_end  # catkin_build_downstream_pkgs
+function run_source_tests {
+    ici_require_run_in_docker # this script must be run in docker
 
-    ici_time_start catkin_build_tests
-    catkin build --no-deps --catkin-make-args tests -- $OPT_VI --summarize  --no-status $PKGS_DOWNSTREAM $CATKIN_PARALLEL_JOBS --make-args $ROS_PARALLEL_JOBS --
+    prepare_source_tests
 
-    ici_time_end  # catkin_build_tests
-    ici_time_start catkin_run_tests
-    catkin build --no-deps --catkin-make-args run_tests -- $OPT_RUN_V --no-status $PKGS_DOWNSTREAM $CATKIN_PARALLEL_TEST_JOBS --make-args $ROS_PARALLEL_TEST_JOBS --
-    catkin_test_results --verbose $CATKIN_WORKSPACE || error
-    ici_time_end  # catkin_run_tests
-fi
+    local opt_vi
+    if [ "$VERBOSE_OUTPUT" == true ]; then
+        opt_vi="-vi"
+    fi
+    local opt_run_v
+    if [ "$VERBOSE_TESTS" != false ]; then
+        opt_run_v="-v"
+    fi
+
+    ici_time_start setup_workspace
+    export CATKIN_WORKSPACE=~/catkin_ws
+    prepare_sourcespace "$CATKIN_WORKSPACE/src" $UPSTREAM_WORKSPACE
+
+    catkin config -w "$CATKIN_WORKSPACE"  -install
+    if [ -n "$CATKIN_CONFIG" ]; then eval catkin config -w "$CATKIN_WORKSPACE" $CATKIN_CONFIG; fi
+    ici_time_end  # setup_workspace
+
+    if [ "${BEFORE_SCRIPT// }" != "" ]; then
+      ici_time_start before_script
+      bash -e -c "cd $TARGET_REPO_PATH; ${BEFORE_SCRIPT}"
+      ici_time_end  # before_script
+    fi
+
+    ici_time_start rosdep_install
+
+    rosdep_opts=(-q --from-paths "$CATKIN_WORKSPACE/src" --ignore-src --rosdistro $ROS_DISTRO -y)
+    if [ -n "$ROSDEP_SKIP_KEYS" ]; then
+      rosdep_opts+=(--skip-keys "$ROSDEP_SKIP_KEYS")
+    fi
+    set -o pipefail # fail if rosdep install fails
+    rosdep install "${rosdep_opts[@]}" | { grep "executing command" || true; }
+    set +o pipefail
+
+    ici_time_end  # rosdep_install
+
+    if [ "$CATKIN_LINT" == "true" ] || [ "$CATKIN_LINT" == "pedantic" ]; then
+        ici_time_start catkin_lint
+        local catkin_lint_args=($CATKIN_LINT_ARGS)
+        if [ "$CATKIN_LINT" == "pedantic" ]; then
+        	catkin_lint_args+=(--strict -W2)
+        fi
+        run_catkin_lint "$TARGET_REPO_PATH" "${catkin_lint_args[@]}"
+        ici_time_end  # catkin_lint
+    fi
+
+
+    # for catkin
+    if [ "${TARGET_PKGS// }" == "" ]; then export TARGET_PKGS=`catkin_topological_order ${TARGET_REPO_PATH} --only-names`; fi
+    # fall-back to all workspace packages if target repo does not contain any packages (#232)
+    if [ "${TARGET_PKGS// }" == "" ]; then export TARGET_PKGS=`catkin_topological_order "$CATKIN_WORKSPACE/src" --only-names`; fi
+    if [ "${PKGS_DOWNSTREAM// }" == "" ]; then export PKGS_DOWNSTREAM=$( [ "${BUILD_PKGS_WHITELIST// }" == "" ] && echo "$TARGET_PKGS" || echo "$BUILD_PKGS_WHITELIST"); fi
+
+    ici_time_start catkin_build
+    catkin build -w "$CATKIN_WORKSPACE" $OPT_VI --summarize  --no-status $BUILD_PKGS_WHITELIST $CATKIN_PARALLEL_JOBS --make-args $ROS_PARALLEL_JOBS
+    ici_time_end  # catkin_build
+
+    if [ "$NOT_TEST_BUILD" != "true" ]; then
+        ici_time_start catkin_build_downstream_pkgs
+        catkin build -w "$CATKIN_WORKSPACE" $OPT_VI --summarize  --no-status $PKGS_DOWNSTREAM $CATKIN_PARALLEL_JOBS --make-args $ROS_PARALLEL_JOBS
+        ici_time_end  # catkin_build_downstream_pkgs
+
+        ici_time_start catkin_build_tests
+        catkin build  -w "$CATKIN_WORKSPACE" --no-deps --catkin-make-args tests -- $OPT_VI --summarize  --no-status $PKGS_DOWNSTREAM $CATKIN_PARALLEL_JOBS --make-args $ROS_PARALLEL_JOBS --
+
+        ici_time_end  # catkin_build_tests
+        ici_time_start catkin_run_tests
+        catkin build -w "$CATKIN_WORKSPACE" --no-deps --catkin-make-args run_tests -- $OPT_RUN_V --no-status $PKGS_DOWNSTREAM $CATKIN_PARALLEL_TEST_JOBS --make-args $ROS_PARALLEL_TEST_JOBS --
+        catkin_test_results --verbose "$CATKIN_WORKSPACE" || error
+        ici_time_end  # catkin_run_tests
+    fi
+
+}

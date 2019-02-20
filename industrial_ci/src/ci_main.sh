@@ -44,6 +44,7 @@ elif [ -n "$CLANG_FORMAT_CHECK" ]; then
   run_clang_format_check
 else
   source ${ICI_SRC_PATH}/tests/source_tests.sh
+  run_source_tests
 fi
 
 if [ "${AFTER_SCRIPT// }" != "" ]; then
