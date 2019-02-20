@@ -38,7 +38,6 @@ function prepare_source_tests {
     if [ "$ADDITIONAL_DEBS" ]; then
         sudo apt-get install -qq -y $ADDITIONAL_DEBS || error "One or more additional deb installation is failed. Exiting."
     fi
-    source /opt/ros/$ROS_DISTRO/setup.bash
     ici_time_end  # setup_apt
 
     if [ "$CCACHE_DIR" ]; then
@@ -104,6 +103,9 @@ function prepare_upstream {
             wget -O- -q "$upstream" | vcs import "$sourcespace"
             set +o pipefail
             ;;
+        -*)
+            rm -rf  "$sourcespace/${upstream:1}"
+            ;;
         *)
             vcs_import_file "$sourcespace" "$upstream"
             ;;
@@ -111,33 +113,66 @@ function prepare_upstream {
     done
 }
 
+function build_workspace {
+    local name=$1; shift
+    local ws=$1; shift
+    local extend=$1; shift
+
+    ici_time_start "setup_${name}_workspace"
+    mkdir -p "$ws/src"
+    prepare_upstream "$ws/src" $*
+    catkin config -w "$ws"  --install --extend "$extend"
+    ici_time_end # "setup_$name_workspace"
+
+    ici_time_start "${name}_rosdep_install"
+
+    rosdep_opts=(-q --from-paths "$ws/src" "$extend" --ignore-src --rosdistro $ROS_DISTRO -y)
+    if [ -n "$ROSDEP_SKIP_KEYS" ]; then
+      rosdep_opts+=(--skip-keys "$ROSDEP_SKIP_KEYS")
+    fi
+    set -o pipefail # fail if rosdep install fails
+    (source "$extend/setup.bash"; rosdep install "${rosdep_opts[@]}") | { grep "executing command" || true; }
+    set +o pipefail
+
+    catkin build -w "$ws" $OPT_VI
+
+    ici_time_end  # {name}_rosdep_install
+}
+
+function test_workspace {
+    local name=$1; shift
+    local ws=$1; shift
+
+    ici_time_start "build_${name}_tests"
+    catkin build  -w "$ws" --catkin-make-args tests -- $OPT_VI --summarize  --no-status
+    ici_time_end # "build_${name}_tests"
+
+    ici_time_start "run_${name}_tests"
+    catkin build -w "$ws" --catkin-make-args run_tests -- $OPT_RUN_V --no-status --
+    catkin_test_results --verbose "$ws" || error
+    ici_time_end # "run_${name}_tests"
+}
+
 function run_source_tests {
     ici_require_run_in_docker # this script must be run in docker
 
     prepare_source_tests
 
-    local opt_vi
+    local OPT_VI
     if [ "$VERBOSE_OUTPUT" == true ]; then
-        opt_vi="-vi"
+        OPT_VI="-vi"
     fi
-    local opt_run_v
+    local OPT_RUN_V
     if [ "$VERBOSE_TESTS" != false ]; then
-        opt_run_v="-v"
+        OPT_RUN_V="-v"
     fi
 
-    ici_time_start setup_workspace
     export CATKIN_WORKSPACE=~/catkin_ws
-    prepare_upstream "$CATKIN_WORKSPACE/src/_upstream" $UPSTREAM_WORKSPACE
+    local upstream_workspace=~/upstream_ws
 
-    for p in $(catkin_topological_order "${TARGET_REPO_PATH}" --only-names); do
-        local dup=$(catkin_find_pkg "$p" "$CATKIN_WORKSPACE/src" 2> /dev/null)
-        if [ -n "$dup" ]; then
-            ici_warn "removing duplicated package '$p' ($dup)"
-            rm -rf "$dup"
-        fi
-    done
+    build_workspace upstream "$upstream_workspace" "/opt/ros/$ROS_DISTRO" $UPSTREAM_WORKSPACE
 
-    # TARGET_REPO_PATH is the path of the downstream repository that we are testing. copy it to the catkin workspace
+    mkdir -p "$CATKIN_WORKSPACE/src"
     cp -a $TARGET_REPO_PATH "$CATKIN_WORKSPACE/src"
 
     if [ "${USE_MOCKUP// }" != "" ]; then
@@ -146,29 +181,6 @@ function run_source_tests {
         fi
         ln -sf "$TARGET_REPO_PATH/$USE_MOCKUP" "$CATKIN_WORKSPACE/src"
     fi
-
-    catkin config -w "$CATKIN_WORKSPACE"  --install
-    if [ -n "$CATKIN_CONFIG" ]; then eval catkin config -w "$CATKIN_WORKSPACE" $CATKIN_CONFIG; fi
-    ici_time_end  # setup_workspace
-
-    if [ "${BEFORE_SCRIPT// }" != "" ]; then
-      ici_time_start before_script
-      bash -e -c "cd $TARGET_REPO_PATH; ${BEFORE_SCRIPT}"
-      ici_time_end  # before_script
-    fi
-
-    ici_time_start rosdep_install
-
-    rosdep_opts=(-q --from-paths "$CATKIN_WORKSPACE/src" --ignore-src --rosdistro $ROS_DISTRO -y)
-    if [ -n "$ROSDEP_SKIP_KEYS" ]; then
-      rosdep_opts+=(--skip-keys "$ROSDEP_SKIP_KEYS")
-    fi
-    set -o pipefail # fail if rosdep install fails
-    rosdep install "${rosdep_opts[@]}" | { grep "executing command" || true; }
-    set +o pipefail
-
-    ici_time_end  # rosdep_install
-
     if [ "$CATKIN_LINT" == "true" ] || [ "$CATKIN_LINT" == "pedantic" ]; then
         ici_time_start catkin_lint
         local catkin_lint_args=($CATKIN_LINT_ARGS)
@@ -179,30 +191,18 @@ function run_source_tests {
         ici_time_end  # catkin_lint
     fi
 
-
-    # for catkin
-    if [ "${TARGET_PKGS// }" == "" ]; then export TARGET_PKGS=`catkin_topological_order ${TARGET_REPO_PATH} --only-names`; fi
-    # fall-back to all workspace packages if target repo does not contain any packages (#232)
-    if [ "${TARGET_PKGS// }" == "" ]; then export TARGET_PKGS=`catkin_topological_order "$CATKIN_WORKSPACE/src" --only-names`; fi
-    if [ "${PKGS_DOWNSTREAM// }" == "" ]; then export PKGS_DOWNSTREAM=$( [ "${BUILD_PKGS_WHITELIST// }" == "" ] && echo "$TARGET_PKGS" || echo "$BUILD_PKGS_WHITELIST"); fi
-
-    ici_time_start catkin_build
-    catkin build -w "$CATKIN_WORKSPACE" $OPT_VI --summarize  --no-status $BUILD_PKGS_WHITELIST $CATKIN_PARALLEL_JOBS --make-args $ROS_PARALLEL_JOBS
-    ici_time_end  # catkin_build
+    build_workspace target "$CATKIN_WORKSPACE" "$upstream_workspace/install"
 
     if [ "$NOT_TEST_BUILD" != "true" ]; then
-        ici_time_start catkin_build_downstream_pkgs
-        catkin build -w "$CATKIN_WORKSPACE" $OPT_VI --summarize  --no-status $PKGS_DOWNSTREAM $CATKIN_PARALLEL_JOBS --make-args $ROS_PARALLEL_JOBS
-        ici_time_end  # catkin_build_downstream_pkgs
-
-        ici_time_start catkin_build_tests
-        catkin build  -w "$CATKIN_WORKSPACE" --no-deps --catkin-make-args tests -- $OPT_VI --summarize  --no-status $PKGS_DOWNSTREAM $CATKIN_PARALLEL_JOBS --make-args $ROS_PARALLEL_JOBS --
-
-        ici_time_end  # catkin_build_tests
-        ici_time_start catkin_run_tests
-        catkin build -w "$CATKIN_WORKSPACE" --no-deps --catkin-make-args run_tests -- $OPT_RUN_V --no-status $PKGS_DOWNSTREAM $CATKIN_PARALLEL_TEST_JOBS --make-args $ROS_PARALLEL_TEST_JOBS --
-        catkin_test_results --verbose "$CATKIN_WORKSPACE" || error
-        ici_time_end  # catkin_run_tests
+        test_workspace target "$CATKIN_WORKSPACE"
     fi
 
+    if [ -n "$DOWNSTREAM_WORKSPACE" ]; then
+        local downstream_workspace=~/downstream_ws
+        build_workspace downstream "$downstream_workspace" "$CATKIN_WORKSPACE/install" $DOWNSTREAM_WORKSPACE
+
+        if [ "$NOT_TEST_DOWNSTREAM" != "true" ]; then
+            test_workspace downstream "$downstream_workspace"
+        fi
+    fi
 }
