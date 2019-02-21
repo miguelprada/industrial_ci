@@ -106,7 +106,7 @@ function install_dependencies {
       rosdep_opts+=(--skip-keys "$skip_keys")
     fi
     set -o pipefail # fail if rosdep install fails
-    exec_in_workspace "$extend" "." rosdep install "${rosdep_opts[@]}" | { grep "executing command" || true; }
+    exec_in_workspace "$extend" "." rosdep install "${rosdep_opts[@]}" #| { grep "executing command" || true; }
     set +o pipefail
 }
 
