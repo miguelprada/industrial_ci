@@ -30,25 +30,7 @@ function run_catkin_lint {
     catkin_lint --explain "$@" "$path" && echo "catkin_lint passed." || error "catkin_lint failed by either/both errors and/or warnings"
 }
 
-function prepare_source_tests {
-    ici_time_start setup_apt
-    sudo apt-get update -qq
-
-    # If more DEBs needed during preparation, define ADDITIONAL_DEBS variable where you list the name of DEB(S, delimitted by whitespace)
-    if [ "$ADDITIONAL_DEBS" ]; then
-        sudo apt-get install -qq -y $ADDITIONAL_DEBS || error "One or more additional deb installation is failed. Exiting."
-    fi
-    ici_time_end  # setup_apt
-
-    if [ "$CCACHE_DIR" ]; then
-        ici_time_start setup_ccache
-        sudo apt-get install -qq -y ccache || error "Could not install ccache. Exiting."
-        export PATH="/usr/lib/ccache:$PATH"
-        ici_time_end  # setup_ccache
-    fi
-
-    ici_time_start setup_rosdep
-
+function setup_rosdep {
     # Setup rosdep
     rosdep --version
     if ! [ -d /etc/ros/rosdep/sources.list.d ]; then
@@ -65,8 +47,23 @@ function prepare_source_tests {
     esac
 
     ici_retry 2 rosdep update "${update_opts[@]}"
+}
 
-    ici_time_end  # setup_rosdep
+function prepare_source_tests {
+    ici_time_start setup_apt
+    sudo apt-get update -qq
+    # If more DEBs needed during preparation, define ADDITIONAL_DEBS variable where you list the name of DEB(S, delimitted by whitespace)
+    if [ "$ADDITIONAL_DEBS" ]; then
+        sudo apt-get install -qq -y $ADDITIONAL_DEBS || error "One or more additional deb installation is failed. Exiting."
+    fi
+    ici_time_end  # setup_apt
+
+    if [ "$CCACHE_DIR" ]; then
+        ici_run "setup_ccache" sudo apt-get install -qq -y ccache
+        export PATH="/usr/lib/ccache:$PATH"
+    fi
+
+    ici_run "setup_rosdep" setup_rosdep
 }
 
 function vcs_import_file {
@@ -85,7 +82,7 @@ function vcs_import_file {
 
 }
 
-function prepare_upstream {
+function prepare_sourcespace {
     local sourcespace="$1"; shift
 
     mkdir -p "$sourcespace"
@@ -112,42 +109,60 @@ function prepare_upstream {
         esac
     done
 }
+function exec_in_workspace {
+    local extend=$1; shift
+    local path=$1; shift
+    ([ -e "$extend/setup.bash" ] && source "$extend/setup.bash"; cd "$path"; exec "$@")
+}
+
+function install_dependencies {
+    local extend=$1; shift
+    local skip_keys=$1; shift
+    rosdep_opts=(-q --from-paths "$@" --ignore-src -y)
+    if [ -n "$skip_keys" ]; then
+      rosdep_opts+=(--skip-keys "$skip_keys")
+    fi
+    set -o pipefail # fail if rosdep install fails
+    exec_in_workspace "$extend" "." rosdep install "${rosdep_opts[@]}" | { grep "executing command" || true; }
+    set +o pipefail
+
+}
+function builder_run_build {
+    local extend=$1; shift
+    local ws=$1; shift
+    exec_in_workspace "$extend" "$ws" colcon build
+}
+
+function builder_run_test {
+    local extend=$1; shift
+    local ws=$1; shift
+    exec_in_workspace "$extend" "$ws" colcon test
+}
+
+function builder_test_results {
+    local extend=$1; shift
+    local ws=$1; shift
+    exec_in_workspace "$extend" "$ws" colcon test
+}
+
 
 function build_workspace {
     local name=$1; shift
-    local ws=$1; shift
     local extend=$1; shift
+    local ws=$1; shift
 
-    ici_time_start "setup_${name}_workspace"
-    mkdir -p "$ws/src"
-    prepare_upstream "$ws/src" $*
-    ici_time_end # "setup_$name_workspace"
-
-    ici_time_start "${name}_rosdep_install"
-
-    rosdep_opts=(-q --from-paths "$ws/src" --ignore-src --rosdistro $ROS_DISTRO -y)
-    if [ -n "$ROSDEP_SKIP_KEYS" ]; then
-      rosdep_opts+=(--skip-keys "$ROSDEP_SKIP_KEYS")
-    fi
-    set -o pipefail # fail if rosdep install fails
-    ([ -e "$extend/setup.bash" ] && source "$extend/setup.bash"; exec rosdep install "${rosdep_opts[@]}") #| { grep "executing command" || true; }
-    set +o pipefail
-    ici_time_end  # {name}_rosdep_install
-
-    ici_time_start  "build_${name}_workspace"
-    (source "$extend/setup.bash"; cd "$ws"; exec colcon build)
-    ici_time_end  # ${name}_rosdep_install
+    ici_run "setup_${name}_workspace" prepare_sourcespace "$ws/src" $*
+    ici_run "install_${name}_dependencies" install_dependencies "$extend" "$ROSDEP_SKIP_KEYS" "$ws/src"
+    ici_run "build_${name}_workspace" builder_run_build "$extend" "$ws"
 }
 
 function test_workspace {
     local name=$1; shift
-    local ws=$1; shift
     local extend=$1; shift
+    local ws=$1; shift
 
-    ici_time_start "run_${name}_tests"
-    (source "$extend/setup.bash"; cd "$ws"; exec colcon test)
-    (source "$extend/setup.bash"; cd "$ws"; exec colcon test-result --all )
-    ici_time_end # "run_${name}_tests"
+    ici_time_start "run_${name}_test" builder_run_tests "$extend" "$ws"
+    builder_test_results "$extend" "$ws"
 }
 
 function run_source_tests {
@@ -169,7 +184,7 @@ function run_source_tests {
     local extend="/opt/ros/$ROS_DISTRO"
 
     if [ -n "$UPSTREAM_WORKSPACE" ]; then
-        build_workspace upstream "$upstream_workspace" "$extend" $UPSTREAM_WORKSPACE
+        build_workspace upstream "$extend" "$upstream_workspace" $UPSTREAM_WORKSPACE
         extend="$upstream_workspace/install"
     fi
 
@@ -180,31 +195,31 @@ function run_source_tests {
         if [ ! -d "$TARGET_REPO_PATH/$USE_MOCKUP" ]; then
             error "mockup directory '$USE_MOCKUP' does not exist"
         fi
-        ln -sf "$TARGET_REPO_PATH/$USE_MOCKUP" "$CATKIN_WORKSPACE/src"
+        cp -a "$TARGET_REPO_PATH/$USE_MOCKUP" "$CATKIN_WORKSPACE/src"
     fi
+
     if [ "$CATKIN_LINT" == "true" ] || [ "$CATKIN_LINT" == "pedantic" ]; then
-        ici_time_start catkin_lint
         local catkin_lint_args=($CATKIN_LINT_ARGS)
         if [ "$CATKIN_LINT" == "pedantic" ]; then
         	catkin_lint_args+=(--strict -W2)
         fi
-        run_catkin_lint "$TARGET_REPO_PATH" "${catkin_lint_args[@]}"
-        ici_time_end  # catkin_lint
+        ici_run "catkin_lint" run_catkin_lint "$TARGET_REPO_PATH" "${catkin_lint_args[@]}"
     fi
-    build_workspace target "$CATKIN_WORKSPACE" "$extend"
+
+    build_workspace "target" "$extend" "$CATKIN_WORKSPACE"
 
     if [ "$NOT_TEST_BUILD" != "true" ]; then
-        test_workspace target "$CATKIN_WORKSPACE" "$extend"
+        test_workspace "target" "$extend" "$CATKIN_WORKSPACE"
     fi
 
     extend="$CATKIN_WORKSPACE/install"
 
     if [ -n "$DOWNSTREAM_WORKSPACE" ]; then
         local downstream_workspace=~/downstream_ws
-        build_workspace downstream "$downstream_workspace" "$extend" $DOWNSTREAM_WORKSPACE
+        build_workspace "downstream" "$extend" "$downstream_workspace" $DOWNSTREAM_WORKSPACE
 
         if [ "$NOT_TEST_DOWNSTREAM" != "true" ]; then
-            test_workspace downstream "$downstream_workspace" "$extend"
+            test_workspace "downstream" "$extend" "$downstream_workspace"
         fi
     fi
 }
