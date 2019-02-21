@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Copyright (c) 2015, Isaac I. Y. Saito
-# Copyright (c) 2017, Mathias Luedtke
+# Copyright (c) 2017, Mathias Lüdtke
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,7 +22,12 @@
 # It is dependent on environment variables that need to be exported in advance
 # (As of version 0.4.4 most of them are defined in env.sh).
 
-# execute BEFORE_SCRIPT in repository, exit on errors
+
+function exec_in_workspace {
+    local extend=$1; shift
+    local path=$1; shift
+    ([ -e "$extend/setup.bash" ] && source "$extend/setup.bash"; cd "$path"; exec "$@")
+}
 
 function run_catkin_lint {
     local path=$1; shift
@@ -47,23 +52,6 @@ function setup_rosdep {
     esac
 
     ici_retry 2 rosdep update "${update_opts[@]}"
-}
-
-function prepare_source_tests {
-    ici_time_start setup_apt
-    sudo apt-get update -qq
-    # If more DEBs needed during preparation, define ADDITIONAL_DEBS variable where you list the name of DEB(S, delimitted by whitespace)
-    if [ "$ADDITIONAL_DEBS" ]; then
-        sudo apt-get install -qq -y $ADDITIONAL_DEBS || error "One or more additional deb installation is failed. Exiting."
-    fi
-    ici_time_end  # setup_apt
-
-    if [ "$CCACHE_DIR" ]; then
-        ici_run "setup_ccache" sudo apt-get install -qq -y ccache
-        export PATH="/usr/lib/ccache:$PATH"
-    fi
-
-    ici_run "setup_rosdep" setup_rosdep
 }
 
 function vcs_import_file {
@@ -109,11 +97,6 @@ function prepare_sourcespace {
         esac
     done
 }
-function exec_in_workspace {
-    local extend=$1; shift
-    local path=$1; shift
-    ([ -e "$extend/setup.bash" ] && source "$extend/setup.bash"; cd "$path"; exec "$@")
-}
 
 function install_dependencies {
     local extend=$1; shift
@@ -125,26 +108,7 @@ function install_dependencies {
     set -o pipefail # fail if rosdep install fails
     exec_in_workspace "$extend" "." rosdep install "${rosdep_opts[@]}" | { grep "executing command" || true; }
     set +o pipefail
-
 }
-function builder_run_build {
-    local extend=$1; shift
-    local ws=$1; shift
-    exec_in_workspace "$extend" "$ws" colcon build
-}
-
-function builder_run_test {
-    local extend=$1; shift
-    local ws=$1; shift
-    exec_in_workspace "$extend" "$ws" colcon test
-}
-
-function builder_test_results {
-    local extend=$1; shift
-    local ws=$1; shift
-    exec_in_workspace "$extend" "$ws" colcon test
-}
-
 
 function build_workspace {
     local name=$1; shift
@@ -166,9 +130,26 @@ function test_workspace {
 }
 
 function run_source_tests {
+    source "${ICI_SRC_PATH}/builders/$BUILDER.sh" || error "Builder '$BUILDER' not supported"
+
     ici_require_run_in_docker # this script must be run in docker
 
-    prepare_source_tests
+    ici_time_start setup_apt
+    sudo apt-get update -qq
+    # If more DEBs needed during preparation, define ADDITIONAL_DEBS variable where you list the name of DEB(S, delimitted by whitespace)
+    if [ "$ADDITIONAL_DEBS" ]; then
+        sudo apt-get install -qq -y $ADDITIONAL_DEBS || error "One or more additional deb installation is failed. Exiting."
+    fi
+    ici_time_end  # setup_apt
+
+    if [ "$CCACHE_DIR" ]; then
+        ici_run "setup_ccache" sudo apt-get install -qq -y ccache
+        export PATH="/usr/lib/ccache:$PATH"
+    fi
+
+    ici_run "${BUILDER}_setup" ici_quiet builder_setup
+
+    ici_run "setup_rosdep" setup_rosdep
 
     local OPT_VI
     if [ "$VERBOSE_OUTPUT" == true ]; then

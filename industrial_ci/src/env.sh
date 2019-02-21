@@ -44,6 +44,7 @@ DEFAULT_OS_CODE_NAME=""
 case "$ROS_DISTRO" in
 "indigo"|"jade")
     ros1_defaults "trusty"
+    BUILDER=${BUILDER:-catkin_tools}
     ;;
 "kinetic"|"lunar")
     ros1_defaults "xenial"
@@ -55,6 +56,7 @@ case "$ROS_DISTRO" in
     ros2_defaults "bionic"
     ;;
 esac
+BUILDER=${BUILDER:-colcon}
 
 
 # If not specified, use ROS Shadow repository http://wiki.ros.org/ShadowRepository
