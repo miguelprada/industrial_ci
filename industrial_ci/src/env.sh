@@ -16,23 +16,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ici_mark_deprecated USE_DEB "Please migrate to UPSTREAM_WORKSPACE."
-ici_mark_deprecated UBUNTU_OS_CODE_NAME "Was renamed to OS_CODE_NAME."
-if [ ! "$CATKIN_PARALLEL_JOBS" ]; then export CATKIN_PARALLEL_JOBS="-p4"; fi
-if [ ! "$CATKIN_PARALLEL_TEST_JOBS" ]; then export CATKIN_PARALLEL_TEST_JOBS="$CATKIN_PARALLEL_JOBS"; fi
-if [ ! "$ROS_PARALLEL_JOBS" ]; then export ROS_PARALLEL_JOBS="-j8"; fi
-if [ ! "$ROS_PARALLEL_TEST_JOBS" ]; then export ROS_PARALLEL_TEST_JOBS="$ROS_PARALLEL_JOBS"; fi
-# .rosintall file name
+ici_mark_deprecated ROSINSTALL_FILENAME "Please migrate to new UPSTREAM_WORKSPACE format"
 if [ ! "$ROSINSTALL_FILENAME" ]; then export ROSINSTALL_FILENAME=".travis.rosinstall"; fi
-# For apt key stores
-if [ ! "$APTKEY_STORE_HTTPS" ]; then export APTKEY_STORE_HTTPS="https://raw.githubusercontent.com/ros/rosdistro/master/ros.key"; fi
-if [ ! "$APTKEY_STORE_SKS" ]; then export APTKEY_STORE_SKS="hkp://ha.pool.sks-keyservers.net"; fi  # Export a variable for SKS URL for break-testing purpose.
-if [ ! "$HASHKEY_SKS" ]; then export HASHKEY_SKS="0xB01FA116"; fi
-if [ "$USE_DEB" ]; then  # USE_DEB is deprecated. See https://github.com/ros-industrial/industrial_ci/pull/47#discussion_r64882878 for the discussion.
-    if [ "$USE_DEB" != "true" ]; then export UPSTREAM_WORKSPACE="file";
-    else export UPSTREAM_WORKSPACE="debian";
-    fi
-fi
 
 # variables in docker.env without default will be exported with empty string
 # this might break the build, e.g. for Makefile which rely on these variables
@@ -42,20 +27,68 @@ if [ -z "${CPPFLAGS}" ]; then unset CPPFLAGS; fi
 if [ -z "${CXX}" ]; then unset CXX; fi
 if [ -z "${CXXFLAGS}" ]; then unset CXXLAGS; fi
 
+function  ros1_defaults {
+    DEFAULT_OS_CODE_NAME=$1
+    ROS1_DISTRO=${ROS1_DISTRO:-$ROS_DISTRO}
+    ROS1_REPOSITORY_PATH=${ROS1_REPOSITORY_PATH:-$ROS_REPOSITORY_PATH}
+    ROS1_REPO=${ROS1_REPO:-${ROS_REPO:-ros}}
+}
+function  ros2_defaults {
+    DEFAULT_OS_CODE_NAME=$1
+    ROS2_DISTRO=${ROS2_DISTRO:-$ROS_DISTRO}
+    ROS2_REPOSITORY_PATH=${ROS2_REPOSITORY_PATH:-$ROS_REPOSITORY_PATH}
+    ROS2_REPO=${ROS2_REPO:-${ROS_REPO:-ros2}}
+}
+
+DEFAULT_OS_CODE_NAME=""
+case "$ROS_DISTRO" in
+"indigo"|"jade")
+    ros1_defaults "trusty"
+    ;;
+"kinetic"|"lunar")
+    ros1_defaults "xenial"
+    ;;
+"melodic")
+    ros1_defaults "bionic"
+    ;;
+"ardent"|"bouncy"|"crystal")
+    ros2_defaults "bionic"
+    ;;
+esac
+
+
 # If not specified, use ROS Shadow repository http://wiki.ros.org/ShadowRepository
-if [ ! "$ROS_REPOSITORY_PATH" ]; then
-    case "${ROS_REPO:-ros-shadow-fixed}" in
+if [ ! "$ROS1_REPOSITORY_PATH" ]; then
+    case "${ROS1_REPO}" in
     "building")
-        ROS_REPOSITORY_PATH="http://repositories.ros.org/ubuntu/building/"
+        ROS1_REPOSITORY_PATH="http://repositories.ros.org/ubuntu/building/"
         ;;
     "ros"|"main")
-        ROS_REPOSITORY_PATH="http://packages.ros.org/ros/ubuntu"
+        ROS1_REPOSITORY_PATH="http://packages.ros.org/ros/ubuntu"
         ;;
     "ros-shadow-fixed"|"testing")
-        ROS_REPOSITORY_PATH="http://packages.ros.org/ros-shadow-fixed/ubuntu"
+        ROS1_REPOSITORY_PATH="http://packages.ros.org/ros-shadow-fixed/ubuntu"
         ;;
     *)
-        error "ROS repo '$ROS_REPO' is not supported"
+        if [ -n "$ROS1_DISTRO" ]; then
+            error "ROS1 repo '$ROS1_REPO' is not supported"
+        fi
+        ;;
+    esac
+fi
+
+if [ ! "$ROS2_REPOSITORY_PATH" ]; then
+    case "${ROS2_REPO}" in
+    "ros2"|"main")
+        ROS2_REPOSITORY_PATH="http://packages.ros.org/ros2/ubuntu"
+        ;;
+    "ros2-testing"|"testing")
+        ROS2_REPOSITORY_PATH="http://packages.ros.org/ros2-testing/ubuntu"
+        ;;
+    *)
+        if [ -n "$ROS2_DISTRO" ]; then
+            error "ROS2 repo '$ROS2_REPO' is not supported"
+        fi
         ;;
     esac
 fi
@@ -72,21 +105,8 @@ elif [ -z "$OS_CODE_NAME" ]; then
     error "please specify OS_CODE_NAME"
 fi
 
-if [ -n "$UBUNTU_OS_CODE_NAME" ]; then # for backward-compatibility
-    OS_CODE_NAME=$UBUNTU_OS_CODE_NAME
-fi
-
 if [ -z "$OS_CODE_NAME" ]; then
     case "$ROS_DISTRO" in
-    "indigo"|"jade")
-        OS_CODE_NAME="trusty"
-        ;;
-    "kinetic"|"lunar")
-        OS_CODE_NAME="xenial"
-        ;;
-    "melodic"|"ardent"|"bouncy"|"crystal")
-        OS_CODE_NAME="bionic"
-        ;;
     "")
         if [ -n "$DOCKER_IMAGE" ] || [ -n "$DOCKER_BASE_IMAGE" ]; then
           # try to reed ROS_DISTRO from imgae
@@ -100,7 +120,10 @@ if [ -z "$OS_CODE_NAME" ]; then
         fi
         ;;
     *)
-        error "ROS distro '$ROS_DISTRO' is not supported"
+        if [ -z "$DEFAULT_OS_CODE_NAME" ]; then
+            error "ROS distro '$ROS_DISTRO' is not supported"
+        fi
+        OS_CODE_NAME=$DEFAULT_OS_CODE_NAME
         ;;
     esac
 fi

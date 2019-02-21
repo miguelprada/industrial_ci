@@ -231,12 +231,13 @@ RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selectio
 RUN apt-get update -qq \
     && apt-get -qq install --no-install-recommends -y apt-utils gnupg2 wget ca-certificates lsb-release
 
-RUN echo "deb ${ROS_REPOSITORY_PATH} \$(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list
-RUN apt-key adv --keyserver "${APTKEY_STORE_SKS}" --recv-key "${HASHKEY_SKS}" \
-    || { wget "${APTKEY_STORE_HTTPS}" -O - | apt-key add -; }
+RUN [ -z "${ROS1_REPOSITORY_PATH}" ] \
+    || { echo "deb ${ROS1_REPOSITORY_PATH} \$(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list \
+         && apt-key adv --keyserver hkp://ha.pool.sks-keyservers.net:80 --recv-key 421C365BD9FF1F717815A3895523BAEEB01FA116; }
 
-RUN echo "deb [arch=amd64,arm64] http://packages.ros.org/ros2/ubuntu \$(lsb_release -sc) main" > /etc/apt/sources.list.d/ros2-latest.list
-RUN wget -O- http://repo.ros2.org/repos.key | apt-key add -
+RUN [ -z "${ROS2_REPOSITORY_PATH}" ] \
+    || { echo "deb [arch=amd64,arm64] ${ROS2_REPOSITORY_PATH} \$(lsb_release -sc) main" > /etc/apt/sources.list.d/ros2-latest.list \
+         &&  wget -O- http://repo.ros2.org/repos.key | apt-key add -; }
 
 RUN sed -i "/^# deb.*multiverse/ s/^# //" /etc/apt/sources.list \
     && apt-get update -qq \
