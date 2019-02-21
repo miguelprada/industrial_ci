@@ -233,7 +233,7 @@ RUN apt-get update -qq \
 
 RUN [ -z "${ROS1_REPOSITORY_PATH}" ] \
     || { echo "deb ${ROS1_REPOSITORY_PATH} \$(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list \
-         && apt-key adv --keyserver hkp://ha.pool.sks-keyservers.net:80 --recv-key 421C365BD9FF1F717815A3895523BAEEB01FA116; }
+         && apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 421C365BD9FF1F717815A3895523BAEEB01FA116; }
 
 RUN [ -z "${ROS2_REPOSITORY_PATH}" ] \
     || { echo "deb [arch=amd64,arm64] ${ROS2_REPOSITORY_PATH} \$(lsb_release -sc) main" > /etc/apt/sources.list.d/ros2-latest.list \
