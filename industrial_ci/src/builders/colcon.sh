@@ -28,17 +28,17 @@ function builder_setup {
 function builder_run_build {
     local extend=$1; shift
     local ws=$1; shift
-    exec_in_workspace "$extend" "$ws" colcon build
+    exec_in_workspace "$extend" "$ws" colcon build --event-handlers status-
 }
 
 function builder_run_test {
     local extend=$1; shift
     local ws=$1; shift
-    exec_in_workspace "$extend" "$ws" colcon test
+    exec_in_workspace "$extend" "$ws" colcon test --event-handlers status-
 }
 
 function builder_test_results {
     local extend=$1; shift
     local ws=$1; shift
-    exec_in_workspace "$extend" "$ws" colcon test
+    exec_in_workspace "$extend" "$ws" colcon test-result --verbose
 }
