@@ -229,11 +229,14 @@ ENV ROS_DISTRO $ROS_DISTRO
 RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
 
 RUN apt-get update -qq \
-    && apt-get -qq install --no-install-recommends -y apt-utils gnupg wget ca-certificates lsb-release
+    && apt-get -qq install --no-install-recommends -y apt-utils gnupg2 wget ca-certificates lsb-release
 
 RUN echo "deb ${ROS_REPOSITORY_PATH} \$(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list
 RUN apt-key adv --keyserver "${APTKEY_STORE_SKS}" --recv-key "${HASHKEY_SKS}" \
     || { wget "${APTKEY_STORE_HTTPS}" -O - | apt-key add -; }
+
+RUN echo "deb [arch=amd64,arm64] http://packages.ros.org/ros2/ubuntu \$(lsb_release -sc) main" > /etc/apt/sources.list.d/ros2-latest.list
+RUN wget -O- http://repo.ros2.org/repos.key | apt-key add -
 
 RUN sed -i "/^# deb.*multiverse/ s/^# //" /etc/apt/sources.list \
     && apt-get update -qq \

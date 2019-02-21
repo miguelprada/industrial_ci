@@ -84,7 +84,7 @@ if [ -z "$OS_CODE_NAME" ]; then
     "kinetic"|"lunar")
         OS_CODE_NAME="xenial"
         ;;
-    "melodic")
+    "melodic"|"ardent"|"bouncy"|"crystal")
         OS_CODE_NAME="bionic"
         ;;
     "")
