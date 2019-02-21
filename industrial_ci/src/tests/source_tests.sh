@@ -121,35 +121,32 @@ function build_workspace {
     ici_time_start "setup_${name}_workspace"
     mkdir -p "$ws/src"
     prepare_upstream "$ws/src" $*
-    catkin config -w "$ws"  --install --extend "$extend"
     ici_time_end # "setup_$name_workspace"
 
     ici_time_start "${name}_rosdep_install"
 
-    rosdep_opts=(-q --from-paths "$ws/src" "$extend" --ignore-src --rosdistro $ROS_DISTRO -y)
+    rosdep_opts=(-q --from-paths "$ws/src" --ignore-src --rosdistro $ROS_DISTRO -y)
     if [ -n "$ROSDEP_SKIP_KEYS" ]; then
       rosdep_opts+=(--skip-keys "$ROSDEP_SKIP_KEYS")
     fi
     set -o pipefail # fail if rosdep install fails
-    (source "$extend/setup.bash"; rosdep install "${rosdep_opts[@]}") | { grep "executing command" || true; }
+    ([ -e "$extend/setup.bash" ] && source "$extend/setup.bash"; exec rosdep install "${rosdep_opts[@]}") #| { grep "executing command" || true; }
     set +o pipefail
-
-    catkin build -w "$ws" $OPT_VI
-
     ici_time_end  # {name}_rosdep_install
+
+    ici_time_start  "build_${name}_workspace"
+    (source "$extend/setup.bash"; cd "$ws"; exec colcon build)
+    ici_time_end  # ${name}_rosdep_install
 }
 
 function test_workspace {
     local name=$1; shift
     local ws=$1; shift
-
-    ici_time_start "build_${name}_tests"
-    catkin build  -w "$ws" --catkin-make-args tests -- $OPT_VI --summarize  --no-status
-    ici_time_end # "build_${name}_tests"
+    local extend=$1; shift
 
     ici_time_start "run_${name}_tests"
-    catkin build -w "$ws" --catkin-make-args run_tests -- $OPT_RUN_V --no-status --
-    catkin_test_results --verbose "$ws" || error
+    (source "$extend/setup.bash"; cd "$ws"; exec colcon test)
+    (source "$extend/setup.bash"; cd "$ws"; exec colcon test-result --all )
     ici_time_end # "run_${name}_tests"
 }
 
@@ -169,8 +166,12 @@ function run_source_tests {
 
     export CATKIN_WORKSPACE=~/catkin_ws
     local upstream_workspace=~/upstream_ws
+    local extend="/opt/ros/$ROS_DISTRO"
 
-    build_workspace upstream "$upstream_workspace" "/opt/ros/$ROS_DISTRO" $UPSTREAM_WORKSPACE
+    if [ -n "$UPSTREAM_WORKSPACE" ]; then
+        build_workspace upstream "$upstream_workspace" "$extend" $UPSTREAM_WORKSPACE
+        extend="$upstream_workspace/install"
+    fi
 
     mkdir -p "$CATKIN_WORKSPACE/src"
     cp -a $TARGET_REPO_PATH "$CATKIN_WORKSPACE/src"
@@ -190,19 +191,20 @@ function run_source_tests {
         run_catkin_lint "$TARGET_REPO_PATH" "${catkin_lint_args[@]}"
         ici_time_end  # catkin_lint
     fi
-
-    build_workspace target "$CATKIN_WORKSPACE" "$upstream_workspace/install"
+    build_workspace target "$CATKIN_WORKSPACE" "$extend"
 
     if [ "$NOT_TEST_BUILD" != "true" ]; then
-        test_workspace target "$CATKIN_WORKSPACE"
+        test_workspace target "$CATKIN_WORKSPACE" "$extend"
     fi
+
+    extend="$CATKIN_WORKSPACE/install"
 
     if [ -n "$DOWNSTREAM_WORKSPACE" ]; then
         local downstream_workspace=~/downstream_ws
-        build_workspace downstream "$downstream_workspace" "$CATKIN_WORKSPACE/install" $DOWNSTREAM_WORKSPACE
+        build_workspace downstream "$downstream_workspace" "$extend" $DOWNSTREAM_WORKSPACE
 
         if [ "$NOT_TEST_DOWNSTREAM" != "true" ]; then
-            test_workspace downstream "$downstream_workspace"
+            test_workspace downstream "$downstream_workspace" "$extend"
         fi
     fi
 }

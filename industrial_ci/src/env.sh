@@ -33,7 +33,6 @@ if [ "$USE_DEB" ]; then  # USE_DEB is deprecated. See https://github.com/ros-ind
     else export UPSTREAM_WORKSPACE="debian";
     fi
 fi
-if [ ! "$UPSTREAM_WORKSPACE" ]; then export UPSTREAM_WORKSPACE="debian"; fi
 
 # variables in docker.env without default will be exported with empty string
 # this might break the build, e.g. for Makefile which rely on these variables

@@ -240,11 +240,11 @@ RUN sed -i "/^# deb.*multiverse/ s/^# //" /etc/apt/sources.list \
     && apt-get -qq install --no-install-recommends -y \
         build-essential \
         git-core \
-        python-catkin-tools \
+        python3-colcon-common-extensions \
         python-pip \
-        python-rosdep \
-        python-vcstool \
-        ros-$ROS_DISTRO-catkin \
+        python3-pip \
+        python3-rosdep \
+        python3-vcstool \
         ssh-client \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
