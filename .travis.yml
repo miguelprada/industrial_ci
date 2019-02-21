@@ -25,6 +25,7 @@ env:
     - ROS_DISTRO=lunar
     - ROS_DISTRO=melodic
     - ROS_DISTRO=kinetic _EXTERNAL_REPO='ros-controls/ros_control#kinetic-devel' UPSTREAM_WORKSPACE="ros_control.rosinstall -ros_control"
+    - ROS_DISTRO=melodic _EXTERNAL_REPO='ros-controls/ros_control#melodic-devel' UPSTREAM_WORKSPACE="ros_control.rosinstall -ros_control"
     - ROS_DISTRO=bouncy _EXTERNAL_REPO='ros2/joystick_drivers#bouncy'
 matrix:
   allow_failures: []
