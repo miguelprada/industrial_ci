@@ -48,6 +48,7 @@ function set_ros_variables {
     case "$ROS_DISTRO" in
     "indigo"|"jade")
         ros1_defaults "trusty"
+        DEFAULT_DOCKER_IMAGE=""
         ;;
     "kinetic"|"lunar")
         ros1_defaults "xenial"
@@ -64,12 +65,14 @@ function set_ros_variables {
         case "${ROS1_REPO}" in
         "building")
             ROS1_REPOSITORY_PATH="http://repositories.ros.org/ubuntu/building/"
+            DEFAULT_DOCKER_IMAGE=""
             ;;
         "ros"|"main")
             ROS1_REPOSITORY_PATH="http://packages.ros.org/ros/ubuntu"
             ;;
         "ros-shadow-fixed"|"testing")
             ROS1_REPOSITORY_PATH="http://packages.ros.org/ros-shadow-fixed/ubuntu"
+            DEFAULT_DOCKER_IMAGE=""
             ;;
         *)
             if [ -n "$ROS1_DISTRO" ]; then
@@ -86,6 +89,7 @@ function set_ros_variables {
             ;;
         "ros2-testing"|"testing")
             ROS2_REPOSITORY_PATH="http://packages.ros.org/ros2-testing/ubuntu"
+            DEFAULT_DOCKER_IMAGE=""
             ;;
         *)
             if [ -n "$ROS2_DISTRO" ]; then
@@ -131,6 +135,7 @@ if [ -z "$OS_CODE_NAME" ]; then
             error "ROS distro '$ROS_DISTRO' is not supported"
         fi
         OS_CODE_NAME=$DEFAULT_OS_CODE_NAME
+        DEFAULT_DOCKER_IMAGE=${DEFAULT_DOCKER_IMAGE-ros:${ROS_DISTRO}-ros-base}
         ;;
     esac
 else

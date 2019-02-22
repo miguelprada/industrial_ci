@@ -147,6 +147,13 @@ function ici_docker_build() {
   docker build -t "$DOCKER_IMAGE" "${opts[@]}" "$@"
 }
 
+function ici_docker_try_pull {
+    if [ "$DOCKER_PULL" != false ]; then
+        echo "Pulling Docker image '$DOCKER_IMAGE'..."
+        ici_quiet docker pull "$DOCKER_IMAGE"
+    fi
+}
+
 #######################################
 # set-ups the CI docker image
 #
@@ -174,10 +181,14 @@ function ici_prepare_docker_image() {
         ici_quiet ici_docker_build "$DOCKER_FILE"
     fi
   elif [ -z "$DOCKER_IMAGE" ]; then # image was not provided, use default
-     ici_build_default_docker_image
-  elif [ "$DOCKER_PULL" != false ]; then
-     ici_quiet docker pull "$DOCKER_IMAGE"
+    if [ -n "$DEFAULT_DOCKER_IMAGE" ]; then
+        DOCKER_IMAGE=$DEFAULT_DOCKER_IMAGE
+    else
+        ici_build_default_docker_image
+    fi
   fi
+  ici_docker_try_pull
+
   ici_time_end # prepare_docker_image
 }
 
