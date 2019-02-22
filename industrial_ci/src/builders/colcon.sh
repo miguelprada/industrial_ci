@@ -20,18 +20,12 @@ function builder_setup {
         python3-colcon-common-extensions \
         python3-rosdep \
         python3-vcstool
-    if [ $(lsb_release -sc) = "xenial" ]; then
-        pip3 install -U setuptools
-    fi
 }
 
 function builder_run_build {
     local extend=$1; shift
     local ws=$1; shift
-    if [ ! -e "$extend/local_setup.bash" ]; then
-      ln -s "$extend/setup.bash" "$extend/local_setup.bash"
-    fi
-    COLCON_PREFIX_PATH="$extend" exec_in_workspace "$extend" "$ws" colcon build --event-handlers status-
+    exec_in_workspace "$extend" "$ws" colcon build --event-handlers status-
 }
 
 function builder_run_test {

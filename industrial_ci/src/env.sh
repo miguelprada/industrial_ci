@@ -32,19 +32,20 @@ function  ros1_defaults {
     ROS1_DISTRO=${ROS1_DISTRO:-$ROS_DISTRO}
     ROS1_REPOSITORY_PATH=${ROS1_REPOSITORY_PATH:-$ROS_REPOSITORY_PATH}
     ROS1_REPO=${ROS1_REPO:-${ROS_REPO:-ros}}
+    BUILDER=${BUILDER:-catkin_tools}
 }
 function  ros2_defaults {
     DEFAULT_OS_CODE_NAME=$1
     ROS2_DISTRO=${ROS2_DISTRO:-$ROS_DISTRO}
     ROS2_REPOSITORY_PATH=${ROS2_REPOSITORY_PATH:-$ROS_REPOSITORY_PATH}
     ROS2_REPO=${ROS2_REPO:-${ROS_REPO:-ros2}}
+    BUILDER=${BUILDER:-colcon}
 }
 
 DEFAULT_OS_CODE_NAME=""
 case "$ROS_DISTRO" in
 "indigo"|"jade")
     ros1_defaults "trusty"
-    BUILDER=${BUILDER:-catkin_tools}
     ;;
 "kinetic"|"lunar")
     ros1_defaults "xenial"
@@ -56,7 +57,6 @@ case "$ROS_DISTRO" in
     ros2_defaults "bionic"
     ;;
 esac
-BUILDER=${BUILDER:-colcon}
 
 
 # If not specified, use ROS Shadow repository http://wiki.ros.org/ShadowRepository
