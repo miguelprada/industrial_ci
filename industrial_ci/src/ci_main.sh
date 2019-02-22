@@ -21,7 +21,7 @@
 ## See ./README.rst for the detailed usage.
 
 set -e # exit script on errors
-if [ "$DEBUG_BASH" ]; then set -x; fi # print trace if DEBUG
+if [ "$DEBUG_BASH" ]; then set -v; fi # print trace if DEBUG
 
 # Define some env vars that need to come earlier than util.sh
 export ICI_SRC_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"  # The path on CI service (e.g. Travis CI) to industrial_ci src dir.
