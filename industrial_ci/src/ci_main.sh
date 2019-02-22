@@ -29,6 +29,7 @@ export ICI_SRC_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"  # The p
 source ${ICI_SRC_PATH}/util.sh
 source ${ICI_SRC_PATH}/env.sh
 source ${ICI_SRC_PATH}/docker.sh
+source ${ICI_SRC_PATH}/workspace.sh
 
 trap ici_exit EXIT # install industrial_ci exit handler
 
