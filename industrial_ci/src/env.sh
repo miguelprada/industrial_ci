@@ -32,6 +32,7 @@ function  ros1_defaults {
     ROS1_DISTRO=${ROS1_DISTRO:-$ROS_DISTRO}
     ROS1_REPOSITORY_PATH=${ROS1_REPOSITORY_PATH:-$ROS_REPOSITORY_PATH}
     ROS1_REPO=${ROS1_REPO:-${ROS_REPO:-ros}}
+    ROS_VERSION=1
     BUILDER=${BUILDER:-catkin_tools}
 }
 function  ros2_defaults {
@@ -39,62 +40,65 @@ function  ros2_defaults {
     ROS2_DISTRO=${ROS2_DISTRO:-$ROS_DISTRO}
     ROS2_REPOSITORY_PATH=${ROS2_REPOSITORY_PATH:-$ROS_REPOSITORY_PATH}
     ROS2_REPO=${ROS2_REPO:-${ROS_REPO:-ros2}}
+    ROS_VERSION=2
     BUILDER=${BUILDER:-colcon}
 }
 
-DEFAULT_OS_CODE_NAME=""
-case "$ROS_DISTRO" in
-"indigo"|"jade")
-    ros1_defaults "trusty"
-    ;;
-"kinetic"|"lunar")
-    ros1_defaults "xenial"
-    ;;
-"melodic")
-    ros1_defaults "bionic"
-    ;;
-"ardent"|"bouncy"|"crystal")
-    ros2_defaults "bionic"
-    ;;
-esac
+function set_ros_variables {
+    echo "hello"
+    case "$ROS_DISTRO" in
+    "indigo"|"jade")
+        ros1_defaults "trusty"
+        ;;
+    "kinetic"|"lunar")
+        ros1_defaults "xenial"
+        ;;
+    "melodic")
+        ros1_defaults "bionic"
+        ;;
+    "ardent"|"bouncy"|"crystal")
+        ros2_defaults "bionic"
+        ;;
+    esac
 
+    if [ ! "$ROS1_REPOSITORY_PATH" ]; then
+        case "${ROS1_REPO}" in
+        "building")
+            ROS1_REPOSITORY_PATH="http://repositories.ros.org/ubuntu/building/"
+            ;;
+        "ros"|"main")
+            ROS1_REPOSITORY_PATH="http://packages.ros.org/ros/ubuntu"
+            ;;
+        "ros-shadow-fixed"|"testing")
+            ROS1_REPOSITORY_PATH="http://packages.ros.org/ros-shadow-fixed/ubuntu"
+            ;;
+        *)
+            if [ -n "$ROS1_DISTRO" ]; then
+                error "ROS1 repo '$ROS1_REPO' is not supported"
+            fi
+            ;;
+        esac
+    fi
+
+    if [ ! "$ROS2_REPOSITORY_PATH" ]; then
+        case "${ROS2_REPO}" in
+        "ros2"|"main")
+            ROS2_REPOSITORY_PATH="http://packages.ros.org/ros2/ubuntu"
+            ;;
+        "ros2-testing"|"testing")
+            ROS2_REPOSITORY_PATH="http://packages.ros.org/ros2-testing/ubuntu"
+            ;;
+        *)
+            if [ -n "$ROS2_DISTRO" ]; then
+                error "ROS2 repo '$ROS2_REPO' is not supported"
+            fi
+            ;;
+        esac
+    fi
+
+}
 
 # If not specified, use ROS Shadow repository http://wiki.ros.org/ShadowRepository
-if [ ! "$ROS1_REPOSITORY_PATH" ]; then
-    case "${ROS1_REPO}" in
-    "building")
-        ROS1_REPOSITORY_PATH="http://repositories.ros.org/ubuntu/building/"
-        ;;
-    "ros"|"main")
-        ROS1_REPOSITORY_PATH="http://packages.ros.org/ros/ubuntu"
-        ;;
-    "ros-shadow-fixed"|"testing")
-        ROS1_REPOSITORY_PATH="http://packages.ros.org/ros-shadow-fixed/ubuntu"
-        ;;
-    *)
-        if [ -n "$ROS1_DISTRO" ]; then
-            error "ROS1 repo '$ROS1_REPO' is not supported"
-        fi
-        ;;
-    esac
-fi
-
-if [ ! "$ROS2_REPOSITORY_PATH" ]; then
-    case "${ROS2_REPO}" in
-    "ros2"|"main")
-        ROS2_REPOSITORY_PATH="http://packages.ros.org/ros2/ubuntu"
-        ;;
-    "ros2-testing"|"testing")
-        ROS2_REPOSITORY_PATH="http://packages.ros.org/ros2-testing/ubuntu"
-        ;;
-    *)
-        if [ -n "$ROS2_DISTRO" ]; then
-            error "ROS2 repo '$ROS2_REPO' is not supported"
-        fi
-        ;;
-    esac
-fi
-
 export OS_CODE_NAME
 export OS_NAME
 export DOCKER_BASE_IMAGE
@@ -120,14 +124,18 @@ if [ -z "$OS_CODE_NAME" ]; then
         if [ -z "$ROS_DISTRO" ]; then
             error "Please specify ROS_DISTRO"
         fi
+        set_ros_variables
         ;;
     *)
+        set_ros_variables
         if [ -z "$DEFAULT_OS_CODE_NAME" ]; then
             error "ROS distro '$ROS_DISTRO' is not supported"
         fi
         OS_CODE_NAME=$DEFAULT_OS_CODE_NAME
         ;;
     esac
+else
+    set_ros_variables
 fi
 
 if [ -z "$DOCKER_BASE_IMAGE" ]; then
