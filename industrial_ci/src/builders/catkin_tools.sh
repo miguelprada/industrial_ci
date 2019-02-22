@@ -31,7 +31,7 @@ function builder_run_build {
     exec_in_workspace "$extend" "$ws" catkin build $OPT_VI --summarize  --no-status
 }
 
-function builder_run_test {
+function builder_run_tests {
     local extend=$1; shift
     local ws=$1; shift
     exec_in_workspace "$extend" "$ws" catkin build --no-deps --catkin-make-args run_tests -- $OPT_RUN_V --no-status
