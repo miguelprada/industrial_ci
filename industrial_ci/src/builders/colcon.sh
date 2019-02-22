@@ -28,7 +28,10 @@ function builder_setup {
 function builder_run_build {
     local extend=$1; shift
     local ws=$1; shift
-    exec_in_workspace "$extend" "$ws" colcon build --event-handlers status-
+    if [ ! -e "$extend/local_setup.bash" ]; then
+      ln -s "$extend/setup.bash" "$extend/local_setup.bash"
+    fi
+    COLCON_PREFIX_PATH="$extend" exec_in_workspace "$extend" "$ws" colcon build --event-handlers status-
 }
 
 function builder_run_test {
