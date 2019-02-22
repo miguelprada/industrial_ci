@@ -183,11 +183,13 @@ function ici_prepare_docker_image() {
   elif [ -z "$DOCKER_IMAGE" ]; then # image was not provided, use default
     if [ -n "$DEFAULT_DOCKER_IMAGE" ]; then
         DOCKER_IMAGE=$DEFAULT_DOCKER_IMAGE
+        ici_docker_try_pull
     else
         ici_build_default_docker_image
     fi
+  else
+      ici_docker_try_pull
   fi
-  ici_docker_try_pull
 
   ici_time_end # prepare_docker_image
 }
