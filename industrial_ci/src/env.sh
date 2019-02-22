@@ -45,7 +45,6 @@ function  ros2_defaults {
 }
 
 function set_ros_variables {
-    echo "hello"
     case "$ROS_DISTRO" in
     "indigo"|"jade")
         ros1_defaults "trusty"
