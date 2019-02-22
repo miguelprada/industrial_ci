@@ -179,6 +179,6 @@ function test_workspace {
     local extend=$1; shift
     local ws=$1; shift
 
-    ici_time_start "run_${name}_test" builder_run_tests "$extend" "$ws"
+    ici_run "run_${name}_test" builder_run_tests "$extend" "$ws"
     builder_test_results "$extend" "$ws"
 }
