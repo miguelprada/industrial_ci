@@ -116,10 +116,8 @@ if [ -z "$OS_CODE_NAME" ]; then
     case "$ROS_DISTRO" in
     "")
         if [ -n "$DOCKER_IMAGE" ] || [ -n "$DOCKER_BASE_IMAGE" ]; then
-          # try to reed ROS_DISTRO from imgae
-          if [ "$DOCKER_PULL" != false ]; then
-            docker pull "${DOCKER_IMAGE:-$DOCKER_BASE_IMAGE}"
-          fi
+          # try to reed ROS_DISTRO from (base) image
+          ici_docker_try_pull "${DOCKER_IMAGE:-$DOCKER_BASE_IMAGE}"
           ROS_DISTRO=$(docker image inspect --format "{{.Config.Env}}" "${DOCKER_IMAGE:-$DOCKER_BASE_IMAGE}" | grep -o -P "(?<=ROS_DISTRO=)[a-z]*") || true
         fi
         if [ -z "$ROS_DISTRO" ]; then
