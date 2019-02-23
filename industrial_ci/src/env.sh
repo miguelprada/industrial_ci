@@ -135,7 +135,7 @@ if [ -z "$OS_CODE_NAME" ]; then
             error "ROS distro '$ROS_DISTRO' is not supported"
         fi
         OS_CODE_NAME=$DEFAULT_OS_CODE_NAME
-        DEFAULT_DOCKER_IMAGE=${DEFAULT_DOCKER_IMAGE-ros:${ROS_DISTRO}-ros-base}
+        DEFAULT_DOCKER_IMAGE=${DEFAULT_DOCKER_IMAGE-ros:${ROS_DISTRO}-ros-core}
         ;;
     esac
 else
