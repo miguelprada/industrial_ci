@@ -56,12 +56,6 @@ else
   run_source_tests
 fi
 
-if [ "${AFTER_SCRIPT// }" != "" ]; then
-  ici_time_start after_script
-
-  bash -e -c "cd $TARGET_REPO_PATH; ${AFTER_SCRIPT}"
-
-  ici_time_end  # after_script
-fi
+ici_hook "after_script"
 
 ici_exit 0

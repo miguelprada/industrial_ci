@@ -85,9 +85,14 @@ function ici_run_cmd_in_docker() {
     run_opts+=(-v "$qemu_path:$qemu_path:ro")
   fi
 
+  local hooks=()
+  for hook in $(env | grep -o '^\(BEFORE\|AFTER\)_[^=]*'); do
+      hooks+=(-e "$hook")
+  done
   local cid
   cid=$(docker create \
       --env-file "${ICI_SRC_PATH}"/docker.env \
+      "${hooks[@]}" \
       "${run_opts[@]}" \
       "$@")
 
