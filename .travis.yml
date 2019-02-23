@@ -31,7 +31,7 @@ env:
 matrix:
   allow_failures: []
   include:
-    - script: shellcheck -x *.sh industrial_ci/scripts/*_ci industrial_ci/src/builders/*.sh
+    - script: shellcheck -x *.sh industrial_ci/scripts/*_ci industrial_ci/src/*.sh industrial_ci/src/*/*.sh
       env: [shellcheck]
 
 script:

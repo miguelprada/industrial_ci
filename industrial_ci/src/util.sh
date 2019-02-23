@@ -77,16 +77,17 @@ function ici_time_end {
     if [ "$DEBUG_BASH" == true ]; then set +v; fi
     local color_wrap=${1:-${ANSI_GREEN}}
     local exit_code=${2:-$?}
+    local name=$ICI_FOLD_NAME
 
-    if [ -z "$ICI_START_TIME" ]; then ici_warn "[ici_time_end] var ICI_START_TIME is not set. You need to call ici_time_start in advance. Rerutning."; return; fi
+    if [ -z "$ICI_START_TIME" ]; then ici_warn "[ici_time_end] var ICI_START_TIME is not set. You need to call ici_time_start in advance. Returning."; return; fi
     local end_time; end_time=$(date +%s%N)
     local elapsed_seconds; elapsed_seconds=$(( (end_time - ICI_START_TIME)/1000000000 ))
     if [ "$_DO_NOT_FOLD" != "true" ]; then
         echo -e "ici_time:end:$ICI_TIME_ID:start=$ICI_START_TIME,finish=$end_time,duration=$((end_time - ICI_START_TIME))\e[0K"
-        echo -en "ici_fold:end:$ICI_FOLD_NAME"
+        echo -en "ici_fold:end:$name"
     fi
     ici_color_output "$color_wrap" "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
-    echo -e "\e[0K\e[${color_wrap}mFunction $ICI_FOLD_NAME returned with code '${exit_code}' after $(( elapsed_seconds / 60 )) min $(( elapsed_seconds % 60 )) sec \e[0m\n"
+    echo -e "\e[0K\e[${color_wrap}mFunction $name returned with code '${exit_code}' after $(( elapsed_seconds / 60 )) min $(( elapsed_seconds % 60 )) sec \e[0m\n"
 
     unset ICI_FOLD_NAME
     if [ "$DEBUG_BASH" == true ]; then set -v; fi

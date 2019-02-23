@@ -17,6 +17,13 @@
 
 function builder_setup {
   install_pkgs_for_command catkin python-catkin-tools
+  if [ "$VERBOSE_OUTPUT" == true ]; then
+      OPT_VI="-vi"
+  fi
+  if [ "$VERBOSE_TESTS" != false ]; then
+      OPT_RUN_V="-v"
+  fi
+
 }
 
 function builder_run_build {

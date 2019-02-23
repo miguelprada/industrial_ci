@@ -56,15 +56,6 @@ function run_source_tests {
 
     ici_run "setup_rosdep" setup_rosdep
 
-    local OPT_VI
-    if [ "$VERBOSE_OUTPUT" == true ]; then
-        OPT_VI="-vi"
-    fi
-    local OPT_RUN_V
-    if [ "$VERBOSE_TESTS" != false ]; then
-        OPT_RUN_V="-v"
-    fi
-
     local upstream_ws=~/upstream_ws
     local target_ws=~/catkin_ws
     local downstream_ws=~/downstream_ws
