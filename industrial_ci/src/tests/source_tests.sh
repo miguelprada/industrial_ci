@@ -33,6 +33,7 @@ function run_catkin_lint {
 }
 
 function run_source_tests {
+    # shellcheck disable=SC1090
     source "${ICI_SRC_PATH}/builders/$BUILDER.sh" || error "Builder '$BUILDER' not supported"
 
     ici_require_run_in_docker # this script must be run in docker

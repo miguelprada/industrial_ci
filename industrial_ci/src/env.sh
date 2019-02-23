@@ -32,7 +32,6 @@ function  ros1_defaults {
     ROS1_DISTRO=${ROS1_DISTRO:-$ROS_DISTRO}
     ROS1_REPOSITORY_PATH=${ROS1_REPOSITORY_PATH:-$ROS_REPOSITORY_PATH}
     ROS1_REPO=${ROS1_REPO:-${ROS_REPO:-ros}}
-    ROS_VERSION=1
     BUILDER=${BUILDER:-catkin_tools}
 }
 function  ros2_defaults {
@@ -40,7 +39,6 @@ function  ros2_defaults {
     ROS2_DISTRO=${ROS2_DISTRO:-$ROS_DISTRO}
     ROS2_REPOSITORY_PATH=${ROS2_REPOSITORY_PATH:-$ROS_REPOSITORY_PATH}
     ROS2_REPO=${ROS2_REPO:-${ROS_REPO:-ros2}}
-    ROS_VERSION=2
     BUILDER=${BUILDER:-colcon}
 }
 
@@ -105,6 +103,7 @@ function set_ros_variables {
 export OS_CODE_NAME
 export OS_NAME
 export DOCKER_BASE_IMAGE
+export ROS_DISTRO
 
 # exit with error if OS_NAME is set, but OS_CODE_NAME is not.
 # assume ubuntu as default
@@ -113,7 +112,6 @@ if [ -z "$OS_NAME" ]; then
 elif [ -z "$OS_CODE_NAME" ]; then
     error "please specify OS_CODE_NAME"
 fi
-
 if [ -z "$OS_CODE_NAME" ]; then
     case "$ROS_DISTRO" in
     "")
@@ -122,7 +120,7 @@ if [ -z "$OS_CODE_NAME" ]; then
           if [ "$DOCKER_PULL" != false ]; then
             docker pull "${DOCKER_IMAGE:-$DOCKER_BASE_IMAGE}"
           fi
-          export ROS_DISTRO=$(docker image inspect --format "{{.Config.Env}}" "${DOCKER_IMAGE:-$DOCKER_BASE_IMAGE}" | grep -o -P "(?<=ROS_DISTRO=)[a-z]*")
+          ROS_DISTRO=$(docker image inspect --format "{{.Config.Env}}" "${DOCKER_IMAGE:-$DOCKER_BASE_IMAGE}" | grep -o -P "(?<=ROS_DISTRO=)[a-z]*") || true
         fi
         if [ -z "$ROS_DISTRO" ]; then
             error "Please specify ROS_DISTRO"

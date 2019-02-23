@@ -26,6 +26,7 @@
 function exec_in_workspace {
     local extend=$1; shift
     local path=$1; shift
+    # shellcheck disable=SC1090
     ( { [ ! -e "$extend/setup.bash" ] || source "$extend/setup.bash"; } && cd "$path" && exec "$@")
 }
 

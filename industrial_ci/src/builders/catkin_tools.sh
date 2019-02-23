@@ -22,15 +22,20 @@ function builder_setup {
 function builder_run_build {
     local extend=$1; shift
     local ws=$1; shift
+    local opts=($OPT_VI)
     exec_in_workspace "$extend" "$ws" catkin config --install
-    if [ -n "$CATKIN_CONFIG" ]; then exec_in_workspace "$extend" "$ws" eval catkin config $CATKIN_CONFIG; fi
-    exec_in_workspace "$extend" "$ws" catkin build $OPT_VI --summarize  --no-status
+    if [ -n "$CATKIN_CONFIG" ]; then
+      local config=($CATKIN_CONFIG)
+      exec_in_workspace "$extend" "$ws" eval catkin config "${config[@]}"
+    fi
+    exec_in_workspace "$extend" "$ws" catkin build "${opts[@]}" --summarize  --no-status
 }
 
 function builder_run_tests {
     local extend=$1; shift
     local ws=$1; shift
-    exec_in_workspace "$extend" "$ws" catkin build --catkin-make-args run_tests -- $OPT_RUN_V --no-status
+    local opts=($OPT_RUN_V)
+    exec_in_workspace "$extend" "$ws" catkin build --catkin-make-args run_tests -- "${opts[@]}" --no-status
 }
 
 function builder_test_results {

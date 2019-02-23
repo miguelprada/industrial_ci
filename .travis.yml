@@ -30,6 +30,9 @@ env:
     - DOCKER_IMAGE=ros:crystal _EXTERNAL_REPO='ros-controls/control_msgs#crystal-devel'
 matrix:
   allow_failures: []
+  include:
+    - script: shellcheck -x *.sh industrial_ci/scripts/*_ci industrial_ci/src/builders/*.sh
+      env: [shellcheck]
 
 script:
   - industrial_ci/_wrap_test.sh # this script is only for internal use
