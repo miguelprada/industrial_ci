@@ -47,7 +47,7 @@ function ici_color_output {
 #######################################
 
 function ici_time_start {
-    if [ "$DEBUG_BASH" ] && [ "$DEBUG_BASH" == true ]; then set +x; fi
+    if [ "$DEBUG_BASH" == true ]; then set +v; fi
     ICI_START_TIME=$(date +%s%N)
     ICI_TIME_ID=$(printf "%x" "$ICI_START_TIME")
     ICI_FOLD_NAME=$1
@@ -56,7 +56,7 @@ function ici_time_start {
         echo -en "\e[0Kici_time:start:$ICI_TIME_ID"
     fi
     ici_color_output $ANSI_BLUE ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
-    if [ "$DEBUG_BASH" ] && [ "$DEBUG_BASH" == true ]; then set -x; fi
+    if [ "$DEBUG_BASH" == true ]; then set -v; fi
 }
 
 #######################################
@@ -74,7 +74,7 @@ function ici_time_start {
 #   (None)
 #######################################
 function ici_time_end {
-    if [ "$DEBUG_BASH" ] && [ "$DEBUG_BASH" == true ]; then set +x; fi
+    if [ "$DEBUG_BASH" == true ]; then set +v; fi
     local color_wrap=${1:-${ANSI_GREEN}}
     local exit_code=${2:-$?}
 
@@ -89,7 +89,7 @@ function ici_time_end {
     echo -e "\e[0K\e[${color_wrap}mFunction $ICI_FOLD_NAME returned with code '${exit_code}' after $(( elapsed_seconds / 60 )) min $(( elapsed_seconds % 60 )) sec \e[0m\n"
 
     unset ICI_FOLD_NAME
-    if [ "$DEBUG_BASH" ] && [ "$DEBUG_BASH" == true ]; then set -x; fi
+    if [ "$DEBUG_BASH" == true ]; then set -v; fi
 }
 
 function ici_run {
