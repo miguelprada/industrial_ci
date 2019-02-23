@@ -16,10 +16,7 @@
 # limitations under the License.
 
 function builder_setup {
-    apt-get -qq install --no-install-recommends -y \
-        python-catkin-tools \
-        python-rosdep \
-        python-vcstool
+  install_pkgs_for_command catkin python-catkin-tools
 }
 
 function builder_run_build {

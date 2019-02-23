@@ -29,7 +29,15 @@ function exec_in_workspace {
     ( { [ ! -e "$extend/setup.bash" ] || source "$extend/setup.bash"; } && cd "$path" && exec "$@")
 }
 
+function install_pkgs_for_command {
+  local command=$1; shift
+  if ! which "$command" > /dev/null; then
+      apt-get -qq install --no-install-recommends -y "$@"
+  fi
+}
+
 function setup_rosdep {
+    install_pkgs_for_command rosdep python-rosdep
     # Setup rosdep
     rosdep --version
     if ! [ -d /etc/ros/rosdep/sources.list.d ]; then
@@ -83,6 +91,8 @@ function vcs_import_repository {
     local sourcespace=$1; shift
     local url=$1; shift
 
+    install_pkgs_for_command vcs python-vcstool
+
     local -a parts
     parts=($(resolve_scheme "$url"))
     vcs import "$sourcespace" <<< "{repositories: {'${parts[0]}': {type: '${parts[1]}', url: '${parts[2]}', version: '${parts[3]}'}}}"
@@ -91,6 +101,8 @@ function vcs_import_repository {
 function vcs_import_file {
     local sourcespace=$1; shift
     local file=$1; shift
+
+    install_pkgs_for_command vcs python-vcstool
 
     if [ -e "$TARGET_REPO_PATH/$file.$ROS_DISTRO" ]; then
         # install (maybe unreleased version) dependencies from source for specific ros version
@@ -101,6 +113,17 @@ function vcs_import_file {
     else
         error "UPSTREAM_WORKSPACE file '$file[.$ROS_DISTRO]' does not exist"
     fi
+}
+
+function vcs_import_url {
+    local sourcespace=$1; shift
+    local url=$1; shift
+
+    install_pkgs_for_command vcs python-vcstool
+
+    set -o pipefail
+    wget -O- -q "$url" | vcs import "$sourcespace"
+    set +o pipefail
 }
 
 function prepare_sourcespace {
@@ -120,9 +143,7 @@ function prepare_sourcespace {
             vcs_import_repository "$sourcespace" "$source"
             ;;
         http://* | https://*) # When UPSTREAM_WORKSPACE is an http url, use it directly
-            set -o pipefail
-            wget -O- -q "$source" | vcs import "$sourcespace"
-            set +o pipefail
+            vcs_import_url "$sourcespace" "$source"
             ;;
         -*)
             rm -rf "${sourcespace:?}/${source:1}"

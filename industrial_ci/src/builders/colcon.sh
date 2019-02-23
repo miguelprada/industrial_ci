@@ -16,10 +16,7 @@
 # limitations under the License.
 
 function builder_setup {
-    apt-get -qq install --no-install-recommends -y \
-        python3-colcon-common-extensions \
-        python3-rosdep \
-        python3-vcstool
+    install_pkgs_for_command colcon python3-colcon-common-extensions
 }
 
 function builder_run_build {
