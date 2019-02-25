@@ -25,7 +25,8 @@ if [ -n "$_EXTERNAL_REPO" ]; then
     declare -a parts
     parts=($(resolve_scheme "$_EXTERNAL_REPO")) # name, type, url, version
 
-    git clone "${parts[2]}" "$TRAVIS_BUILD_DIR"
+    echo "Cloning '${parts[2]}'...'"
+    git clone -q "${parts[2]}" "$TRAVIS_BUILD_DIR"
     git -C "$TRAVIS_BUILD_DIR" checkout "${parts[3]}"
 
     urlbasename=${parts[2]##*/}
