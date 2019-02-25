@@ -27,7 +27,7 @@ env:
     - ROS_DISTRO=kinetic _EXTERNAL_REPO='github:ros-controls/ros_control#kinetic-devel' UPSTREAM_WORKSPACE="ros_control.rosinstall -ros_control -ros_controllers"
     - ROS_DISTRO=melodic _EXTERNAL_REPO='github:ros-controls/ros_control#melodic-devel' UPSTREAM_WORKSPACE="github:ros-controls/control_msgs#kinetic-devel github:ros-controls/realtime_tools#melodic-devel github:ros-controls/control_toolbox#melodic-devel" DOWNSTREAM_WORKSPACE="github:ros-controls/ros_controllers#melodic-devel"
     - ROS_DISTRO=bouncy _EXTERNAL_REPO='github:ros2/joystick_drivers#bouncy'
-    - DOCKER_IMAGE=ros:crystal _EXTERNAL_REPO='github:ros-controls/control_msgs#crystal-devel'
+    - ROS_DISTRO=crystal _EXTERNAL_REPO='github:ros-controls/control_msgs#crystal-devel' DEFAULT_DOCKER_IMAGE=""
 matrix:
   allow_failures: []
   include:
