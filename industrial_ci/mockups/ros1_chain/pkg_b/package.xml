@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<package format="2">
+
+  <name>pkg_b</name>
+  <version>0.0.0</version>
+  <description>The pkg_b package</description>
+
+  <maintainer email="miguel.prada@tecnalia.com">Miguel Prada</maintainer>
+
+  <license>TODO</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <depend>pkg_a_underlay</depend>
+
+  <export>
+  </export>
+
+</package>
