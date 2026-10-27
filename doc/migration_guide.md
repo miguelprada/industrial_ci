@@ -7,8 +7,8 @@ This guide covers the migration from the [legacy](https://github.com/ros-industr
 The new version comes with a number of improvements:
 
 * Added support for catkin_make, catkin_make_isolated and colcon
-* Use [vcstool](https://github.com/dirk-thomas/vcstool)(`vcs`) instead of `wstool` to support \*.rosinstall and \*.repos files
-* Added support for ROS2, and vcstool (rosinstall or repos files)
+* Use [vcs2l](https://github.com/ros-infrastructure/vcs2l)(`vcs`) instead of `wstool` to support \*.rosinstall and \*.repos files
+* Added support for ROS2, and vcs2l (rosinstall or repos files)
 * Available as GitHub Action
 * Separate upstream and downstream [workspaces](index.rst#workspace-management), even for prerelease tests
 * Fine-grained [hook system](index.rst#customize-within-the-ci-process) for customization

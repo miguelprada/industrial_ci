@@ -21,7 +21,7 @@
 # (As of version 0.4.4 most of them are defined in env.sh).
 
 function setup_ros_buildfarm() {
-    ici_apt_install python3-pip python3-setuptools python3-wheel python3-venv python3-vcstool
+    ici_apt_install python3-pip python3-setuptools python3-wheel python3-venv python3-vcs2l
     ici_cmd python3 -mvenv /tmp/ros_buildfarm --system-site-packages
     ici_cmd ici_quiet /tmp/ros_buildfarm/bin/pip3 install git+https://github.com/ros-infrastructure/ros_buildfarm.git
 }

@@ -205,7 +205,7 @@ function ici_import_repository {
     local sourcespace=$1; shift
     local url=$1; shift
 
-    ici_install_pkgs_for_command vcs python3-vcstool
+    ici_install_pkgs_for_command vcs python3-vcs2l
 
     local parsed; parsed=$(ici_parse_repository_url "$url")
     IFS=" " read -r -a parts <<< "$parsed" # name, type, url, version
@@ -235,7 +235,7 @@ function ici_import_file {
         ici_guard bsdtar -C "$sourcespace" -xf "$file"
         ;;
     *)
-        ici_install_pkgs_for_command vcs python3-vcstool
+        ici_install_pkgs_for_command vcs python3-vcs2l
         ici_setup_git_client
         ici_vcs_import "$sourcespace" < "$file"
     ;;
@@ -254,7 +254,7 @@ function ici_import_url {
         processor=(bsdtar -C "$sourcespace" -xf-)
         ;;
     *)
-        ici_install_pkgs_for_command vcs python3-vcstool
+        ici_install_pkgs_for_command vcs python3-vcs2l
         ici_setup_git_client
         processor=(ici_vcs_import "$sourcespace")
     ;;
